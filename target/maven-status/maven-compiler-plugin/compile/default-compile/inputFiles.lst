@@ -1,0 +1,7 @@
+/home/tesis/productosaec/aec/file-service/src/main/java/com/aec/FileSrv/controller/FileController.java
+/home/tesis/productosaec/aec/file-service/src/main/java/com/aec/FileSrv/config/SecurityConfig.java
+/home/tesis/productosaec/aec/file-service/src/main/java/com/aec/FileSrv/Repository/StoredFileRepository.java
+/home/tesis/productosaec/aec/file-service/src/main/java/com/aec/FileSrv/FileServiceApplication.java
+/home/tesis/productosaec/aec/file-service/src/main/java/com/aec/FileSrv/service/FileStorageService.java
+/home/tesis/productosaec/aec/file-service/src/main/java/com/aec/FileSrv/model/StoredFile.java
+/home/tesis/productosaec/aec/file-service/src/main/java/com/aec/FileSrv/dto/FileInfoDto.java

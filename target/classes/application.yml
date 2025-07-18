@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: aec-file
+  datasource:
+    url:      ${DATASOURCE_URL:jdbc:postgresql://localhost:5432/aec}
+    username: ${DATASOURCE_USER:aec}
+    password: ${DATASOURCE_PASS:2412}
+  jpa:
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  servlet:
+    multipart:
+      max-file-size:        1000MB
+      max-request-size:     1000MB
+
+file:
+  upload-dir: ${UPLOAD_DIR:/home/tesis/productosaec/aec/file-service/uploads}
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.web.filter.CommonsRequestLoggingFilter: DEBUG
+    root: DEBUG

@@ -1,0 +1,11 @@
+# .nixpacks.toml
+# Configuración para un servicio Spring Boot/Maven.
+
+[phases.setup]
+commands = ["export JAVA_HOME=/usr/lib/jvm/default-jvm", "mvn -Dmaven.test.skip=true dependency:resolve"]
+
+[phases.build]
+commands = ["mvn clean package -DskipTests"]
+
+[start]
+cmd = "java -jar target/*.jar"

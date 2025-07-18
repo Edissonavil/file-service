@@ -1,0 +1,9 @@
+com/aec/FileSrv/controller/FileController.class
+com/aec/FileSrv/dto/FileInfoDto$FileInfoDtoBuilder.class
+com/aec/FileSrv/Repository/StoredFileRepository.class
+com/aec/FileSrv/config/SecurityConfig.class
+com/aec/FileSrv/dto/FileInfoDto.class
+com/aec/FileSrv/service/FileStorageService.class
+com/aec/FileSrv/model/StoredFile.class
+com/aec/FileSrv/model/StoredFile$StoredFileBuilder.class
+com/aec/FileSrv/FileServiceApplication.class
