@@ -1,28 +1,29 @@
 spring:
   application:
-    name: aec-file
+    name: aec-file # Nombre de la aplicación, generalmente se usa el nombre del servicio
+
+  # Configuración de la base de datos
   datasource:
-    url:      ${DATASOURCE_URL:jdbc:postgresql://localhost:5432/aec}
-    username: ${DATASOURCE_USER:aec}
-    password: ${DATASOURCE_PASS:2412}
+    url: ${DATASOURCE_URL} # ¡SIN valor por defecto para seguridad!
+    username: ${DATASOURCE_USER} # ¡SIN valor por defecto para seguridad!
+    password: ${DATASOURCE_PASS} # ¡SIN valor por defecto para seguridad!
   jpa:
     hibernate:
-      ddl-auto: ${DDL_AUTO:update}
+      ddl-auto: ${DDL_AUTO:update} # 'update' es un buen valor por defecto para desarrollo.
+                                    # Para producción, considera 'validate' o 'none'.
 
 server:
-  port: ${SERVER_PORT:8084}
-
-spring:
+  port: ${SERVER_PORT:8084} # Puerto por defecto para desarrollo, Railway usará su propio puerto
   servlet:
     multipart:
-      max-file-size:        1000MB
-      max-request-size:     1000MB
+      max-file-size: 1000MB # Tamaño máximo de archivo para subidas
+      max-request-size: 1000MB # Tamaño máximo de la solicitud para subidas
 
 file:
-  upload-dir: ${UPLOAD_DIR:/home/tesis/productosaec/aec/file-service/uploads}
+  upload-dir: ${UPLOAD_DIR:/app/uploads} # ¡Ruta de subida adaptada para Railway!
 
 logging:
   level:
     org.springframework.security: DEBUG
     org.springframework.web.filter.CommonsRequestLoggingFilter: DEBUG
-    root: DEBUG
+    root: DEBUG # Cuidado con 'DEBUG' en producción, puede ser muy verboso. Considera 'INFO' o 'WARN'.
