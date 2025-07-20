@@ -1,37 +1,41 @@
 spring:
   application:
-    name: aec-file # Nombre de la aplicación, generalmente se usa el nombre del servicio
+    name: aec-file
 
-  # Configuración de la base de datos (¡si el servicio de archivos necesita DB!)
+  # PostgreSQL datasource
   datasource:
-    # Usamos las variables específicas de PostgreSQL que Railway inyecta directamente
     url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
     username: ${PGUSER}
     password: ${PGPASSWORD}
     driver-class-name: org.postgresql.Driver
+
   jpa:
     hibernate:
-      ddl-auto: ${DDL_AUTO:update} # 'update' es un buen valor por defecto para desarrollo.
-                                    # Para producción en Railway, ¡usa 'validate' o 'none'!
-    show-sql: true # Útil para depuración. Considera 'false' en producción.
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: true
     properties:
-      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect # Siempre especifica el dialecto
+      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
 
-server:
-  port: ${SERVER_PORT:8084} # Puerto por defecto para desarrollo, Railway usará su propio puerto
   servlet:
     multipart:
-      max-file-size: 1000MB # Tamaño máximo de archivo para subidas
-      max-request-size: 1000MB # Tamaño máximo de la solicitud para subidas
+      max-file-size: ${MAX_FILE_SIZE:1000MB}
+      max-request-size: ${MAX_REQUEST_SIZE:1000MB}
 
-# Configuración del directorio de subida de archivos (¡Importante para Railway!)
+server:
+  port: ${SERVER_PORT:8084}
+
+# Ruta de subida de archivos (se puede montar en Railway como volumen si es necesario)
 file:
-  upload-dir: ${UPLOAD_DIR:/file-service/uploads} # Ruta de directorio genérica dentro del contenedor de Railway
-                                          # ¡Para persistencia real, configura un volumen persistente en Railway!
+  upload-dir: ${UPLOAD_DIR:/file-service/uploads}
+
+# Seguridad (si aplica JWT en este microservicio también)
+jwt:
+  secret: ${JWT_SECRET}
+  accessMs: ${JWT_ACCESS_MS:3600000}
+  refreshMs: ${JWT_REFRESH_MS:86400000}
 
 logging:
   level:
-    org.springframework.security: DEBUG
-    org.springframework.web.filter.CommonsRequestLoggingFilter: DEBUG
-    root: INFO # Cambiado a INFO. 'DEBUG' es muy verboso para entornos de producción.
-                 # Puedes dejarlo en DEBUG si solo es para desarrollo/depuración intensiva.
+    org.springframework.security: ${LOG_SECURITY_LEVEL:DEBUG}
+    org.springframework.web.filter.CommonsRequestLoggingFilter: ${LOG_FILTER_LEVEL:DEBUG}
+    root: ${LOG_ROOT_LEVEL:INFO}
