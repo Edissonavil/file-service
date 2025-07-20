@@ -2,15 +2,20 @@ spring:
   application:
     name: aec-file # Nombre de la aplicación, generalmente se usa el nombre del servicio
 
-  # Configuración de la base de datos
+  # Configuración de la base de datos (¡si el servicio de archivos necesita DB!)
   datasource:
-    url: ${DATASOURCE_URL} # ¡SIN valor por defecto para seguridad!
-    username: ${DATASOURCE_USER} # ¡SIN valor por defecto para seguridad!
-    password: ${DATASOURCE_PASS} # ¡SIN valor por defecto para seguridad!
+    # Usamos las variables específicas de PostgreSQL que Railway inyecta directamente
+    url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
+    username: ${PGUSER}
+    password: ${PGPASSWORD}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
       ddl-auto: ${DDL_AUTO:update} # 'update' es un buen valor por defecto para desarrollo.
-                                    # Para producción, considera 'validate' o 'none'.
+                                    # Para producción en Railway, ¡usa 'validate' o 'none'!
+    show-sql: true # Útil para depuración. Considera 'false' en producción.
+    properties:
+      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect # Siempre especifica el dialecto
 
 server:
   port: ${SERVER_PORT:8084} # Puerto por defecto para desarrollo, Railway usará su propio puerto
@@ -19,11 +24,14 @@ server:
       max-file-size: 1000MB # Tamaño máximo de archivo para subidas
       max-request-size: 1000MB # Tamaño máximo de la solicitud para subidas
 
+# Configuración del directorio de subida de archivos (¡Importante para Railway!)
 file:
-  upload-dir: ${UPLOAD_DIR:/app/uploads} # ¡Ruta de subida adaptada para Railway!
+  upload-dir: ${UPLOAD_DIR:/file-service/uploads} # Ruta de directorio genérica dentro del contenedor de Railway
+                                          # ¡Para persistencia real, configura un volumen persistente en Railway!
 
 logging:
   level:
     org.springframework.security: DEBUG
     org.springframework.web.filter.CommonsRequestLoggingFilter: DEBUG
-    root: DEBUG # Cuidado con 'DEBUG' en producción, puede ser muy verboso. Considera 'INFO' o 'WARN'.
+    root: INFO # Cambiado a INFO. 'DEBUG' es muy verboso para entornos de producción.
+                 # Puedes dejarlo en DEBUG si solo es para desarrollo/depuración intensiva.
