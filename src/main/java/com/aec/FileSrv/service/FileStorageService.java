@@ -30,7 +30,7 @@ public class FileStorageService {
 
     private Path uploadDirPath;
 
-    @Value("${filesrv.upload-dir}")
+    @Value("${file.upload-dir}")
     private String uploadDirString;
 
     // Aquí había una anotación @Value sin un campo, la he omitido o la deberías revisar.
