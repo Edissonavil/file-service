@@ -17,11 +17,6 @@
         <java.version>17</java.version> <jjwt.version>0.12.5</jjwt.version> <postgresql.version>42.7.3</postgresql.version> <commons-io.version>2.16.1</commons-io.version> </properties>
 
     <dependencies>
-    <dependency>
-    <groupId>org.springframework.cloud</groupId>
-    <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
-    <version>4.1.1</version> <!-- Última versión estable (Jul 2024) -->
-</dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
