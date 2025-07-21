@@ -1,6 +1,7 @@
 # ---------- Build Stage ----------
 FROM maven:3.9.7-eclipse-temurin-21 AS build
 WORKDIR /app
+RUN apk add --no-cache curl
 
 # 1.  ⚡️ Pre-cache dependencias
 COPY pom.xml .
