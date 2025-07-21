@@ -22,7 +22,7 @@ spring:
       max-request-size: ${MAX_REQUEST_SIZE:1000MB}
 
 server:
-  port: ${SERVER_PORT:8084}
+  port: ${SERVER_PORT:8080}
 
 # Ruta de subida de archivos (se puede montar en Railway como volumen si es necesario)
 file:
