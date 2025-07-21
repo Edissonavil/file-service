@@ -23,6 +23,7 @@ spring:
 
 server:
   port: ${PORT:8080}
+  address: 0.0.0.0
 
 
 # Ruta de subida de archivos (se puede montar en Railway como volumen si es necesario)
