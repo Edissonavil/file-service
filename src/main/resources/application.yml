@@ -41,3 +41,12 @@ logging:
     org.springframework.security: ${LOG_SECURITY_LEVEL:DEBUG}
     org.springframework.web.filter.CommonsRequestLoggingFilter: ${LOG_FILTER_LEVEL:DEBUG}
     root: ${LOG_ROOT_LEVEL:INFO}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://eureka-server:8761/eureka 
+  instance:
+    prefer-ip-address: true  
+    instance-id: ${spring.application.name}:${random.value} 
+
