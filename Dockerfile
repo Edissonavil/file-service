@@ -1,23 +1,32 @@
-# ---------- Build Stage ----------
+###########################
+# 🔨 Build stage (Debian) #
+###########################
 FROM maven:3.9.7-eclipse-temurin-21 AS build
 WORKDIR /app
-RUN apk add --no-cache curl
 
-# 1.  ⚡️ Pre-cache dependencias
+# 1️⃣ Pre-cache dependencias
 COPY pom.xml .
 RUN mvn -B dependency:go-offline
 
-# 2.  Copiamos SOLO el código de este micro-servicio
+# 2️⃣ Copiamos SOLO el código del micro-servicio
 COPY src src
-RUN mvn -B package -DskipTests
-
-# ---------- Runtime Stage ----------
-FROM eclipse-temurin:21-jre-alpine
+RUN mvn -B package -DskipTests            
+############################
+# 🚀 Runtime stage (Alpine) #
+############################
+FROM eclipse-temurin:21-jre-alpine        
 WORKDIR /app
 
-# 3.  Copiamos el JAR generado
-#    (reemplaza el prefijo por el artefactId real si fuese distinto)
+# 3️⃣ curl para health-check (solo runtime)
+RUN apk add --no-cache curl
+
+# 4️⃣ Copiamos el JAR generado
 COPY --from=build /app/target/*file*.jar app.jar
 
 EXPOSE 8080
+
+# 5️⃣ Health-check interno del contenedor
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
 ENTRYPOINT ["java","-jar","/app/app.jar","--spring.profiles.active=prod"]
