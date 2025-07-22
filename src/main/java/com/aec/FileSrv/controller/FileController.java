@@ -28,9 +28,6 @@ import java.nio.file.NoSuchFileException;
 public class FileController {
     private final FileStorageService storage;
 
-    // Endpoint unificado para servir archivos (productos o comprobantes): /api/files/{entityId}/{filename}
-    // El FileStorageService determinará si es producto o comprobante internamente.
-
     @GetMapping("/{entityId}/{filename:.+}")
     public ResponseEntity<Resource> serveFile(
             @PathVariable Long entityId,
