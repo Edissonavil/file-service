@@ -28,7 +28,7 @@ import java.nio.file.NoSuchFileException;
 public class FileController {
     private final FileStorageService storage;
 
-    @GetMapping("/files/{entityId}/{filename:.+}")
+    @GetMapping("/{entityId}/{filename:.+}")
     public ResponseEntity<Resource> serveFile(
             @PathVariable Long entityId,
             @PathVariable String filename) {

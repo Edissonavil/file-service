@@ -61,22 +61,26 @@ public class FileStorageService {
         }
     }
 
-public Resource loadAsResource(String filename, Long entityId) throws IOException {
-    // Ruta base relativa al directorio de trabajo
-    Path basePath = Paths.get("").toAbsolutePath();
-    Path filePath = basePath.resolve("uploads")
-                          .resolve("productos")
-                          .resolve(entityId.toString())
-                          .resolve(filename);
-    
-    log.info("Buscando archivo en: {}", filePath.toString());
-    
-    if (!Files.exists(filePath)) {
-        throw new NoSuchFileException("Archivo no encontrado: " + filePath);
+  public Resource loadAsResource(String filename, Long entityId) throws IOException {
+        Path filePath = uploadDirPath
+            .resolve("productos")
+            .resolve(entityId.toString())
+            .resolve(filename);
+
+        // si no existe en productos, buscar en comprobantes
+        if (!Files.exists(filePath)) {
+            filePath = uploadDirPath
+                .resolve("comprobantes")
+                .resolve(entityId.toString())
+                .resolve(filename);
+        }
+
+        if (!Files.exists(filePath)) {
+            throw new NoSuchFileException("Archivo no encontrado: " + filePath);
+        }
+
+        return new UrlResource(filePath.toUri());
     }
-    
-    return new UrlResource(filePath.toUri());
-}
 
     public String getFileContentType(String filename, Long entityId) throws IOException {
         Path pathProducto = uploadDirPath.resolve("productos").resolve(String.valueOf(entityId)).resolve(filename);

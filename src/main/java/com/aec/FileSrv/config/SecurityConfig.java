@@ -54,22 +54,16 @@ public class SecurityConfig {
   SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
         .csrf(csrf -> csrf.disable())
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        .authorizeHttpRequests(auth -> auth
-            // ⬇⬇ las fotos ahora son públicas
-            .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
-            .requestMatchers("/uploads/**").permitAll()
-            // ⬇⬇ PERMITE EL ACCESO A LA RUTA DE ERROR
-            .requestMatchers("/error").permitAll() // <-- ¡Añade esta línea!
-
-            // otras reglas que ya tenías
-            .requestMatchers(HttpMethod.POST, "/api/files/public").permitAll()
-            .requestMatchers(HttpMethod.POST, "/api/files/secure")
-            .hasAuthority("ROL_COLABORADOR")
-            .requestMatchers(HttpMethod.POST, "/api/files/receipts/**")
-            .hasAuthority("ROL_CLIENTE") 
-            .anyRequest().authenticated()
-        )
+      .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+      .authorizeHttpRequests(auth -> auth
+          .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
+          .requestMatchers(HttpMethod.POST, "/api/files/public/**").permitAll()
+          .requestMatchers(HttpMethod.POST, "/api/files/secure/**")
+            .hasAnyAuthority("ROL_CLIENTE","ROL_COLABORADOR")
+          .requestMatchers(HttpMethod.POST, "/api/files/receipts/**")
+            .hasAuthority("ROL_CLIENTE")
+          .anyRequest().authenticated()
+      )
         .oauth2ResourceServer(oauth2 -> oauth2
             .jwt(jwt -> jwt
                 .decoder(jwtDecoder())
