@@ -58,7 +58,7 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             // ⬇⬇ las fotos ahora son públicas
             .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
-
+            .requestMatchers("/uploads/**").permitAll()
             // ⬇⬇ PERMITE EL ACCESO A LA RUTA DE ERROR
             .requestMatchers("/error").permitAll() // <-- ¡Añade esta línea!
 

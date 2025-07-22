@@ -18,7 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant; 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -33,7 +33,8 @@ public class FileStorageService {
     @Value("${file.upload-dir}")
     private String uploadDirString;
 
-    // Aquí había una anotación @Value sin un campo, la he omitido o la deberías revisar.
+    // Aquí había una anotación @Value sin un campo, la he omitido o la deberías
+    // revisar.
     // @Value("${file.upload-dir}")
 
     @PostConstruct
@@ -61,34 +62,26 @@ public class FileStorageService {
     }
 
     public Resource loadAsResource(String filename, Long entityId) throws IOException {
-    // Buscar primero en productos
-    Path productPath = uploadDirPath.resolve("productos")
-                                   .resolve(entityId.toString())
-                                   .resolve(filename);
-    
-    if (Files.exists(productPath)) {
-        return new UrlResource(productPath.toUri());
+        Path filePath = uploadDirPath.resolve("productos")
+                .resolve(entityId.toString())
+                .resolve(filename);
+
+        if (!Files.exists(filePath)) {
+            throw new NoSuchFileException("Archivo no encontrado: " + filePath);
+        }
+
+        return new UrlResource(filePath.toUri());
     }
-
-    // Si no está en productos, buscar en comprobantes
-    Path receiptPath = uploadDirPath.resolve("comprobantes")
-                                   .resolve(entityId.toString())
-                                   .resolve(filename);
-    
-    if (Files.exists(receiptPath)) {
-        return new UrlResource(receiptPath.toUri());
-    }
-
-    throw new NoSuchFileException("Archivo no encontrado en ninguna ubicación");
-}
-
 
     public String getFileContentType(String filename, Long entityId) throws IOException {
         Path pathProducto = uploadDirPath.resolve("productos").resolve(String.valueOf(entityId)).resolve(filename);
-        Path pathComprobante = uploadDirPath.resolve("comprobantes").resolve(String.valueOf(entityId)).resolve(filename);
+        Path pathComprobante = uploadDirPath.resolve("comprobantes").resolve(String.valueOf(entityId))
+                .resolve(filename);
 
-        if (Files.exists(pathProducto)) return Files.probeContentType(pathProducto);
-        if (Files.exists(pathComprobante)) return Files.probeContentType(pathComprobante);
+        if (Files.exists(pathProducto))
+            return Files.probeContentType(pathProducto);
+        if (Files.exists(pathComprobante))
+            return Files.probeContentType(pathComprobante);
 
         return "application/octet-stream";
     }
