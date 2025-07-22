@@ -60,15 +60,42 @@ public class FileStorageService {
         }
     }
 
-    public Resource loadAsResource(String filename, Long entityId) throws MalformedURLException, NoSuchFileException {
-        Path pathProducto = uploadDirPath.resolve("productos").resolve(String.valueOf(entityId)).resolve(filename);
-        Path pathComprobante = uploadDirPath.resolve("comprobantes").resolve(String.valueOf(entityId)).resolve(filename);
+    public Resource loadAsResource(String filename, Long entityId)
+        throws IOException, NoSuchFileException {
+    // Construye las rutas posibles
+    Path pathProducto = uploadDirPath
+        .resolve("productos")
+        .resolve(entityId.toString())
+        .resolve(filename);
+    Path pathComprobante = uploadDirPath
+        .resolve("comprobantes")
+        .resolve(entityId.toString())
+        .resolve(filename);
 
-        if (Files.exists(pathProducto)) return new UrlResource(pathProducto.toUri());
-        if (Files.exists(pathComprobante)) return new UrlResource(pathComprobante.toUri());
-
-        throw new NoSuchFileException("Archivo no encontrado: " + filename + " para entidad " + entityId);
+    // Busca en productos
+    if (Files.exists(pathProducto) && !Files.isDirectory(pathProducto)) {
+        try {
+            return new UrlResource(pathProducto.toUri());
+        } catch (MalformedURLException e) {
+            throw new IOException(
+                "URL inválida para el fichero de producto: " + pathProducto, e);
+        }
     }
+
+    // Busca en comprobantes
+    if (Files.exists(pathComprobante) && !Files.isDirectory(pathComprobante)) {
+        try {
+            return new UrlResource(pathComprobante.toUri());
+        } catch (MalformedURLException e) {
+            throw new IOException(
+                "URL inválida para el fichero de comprobante: " + pathComprobante, e);
+        }
+    }
+
+    throw new NoSuchFileException(
+        "Archivo no encontrado: " + filename + " para entidad " + entityId);
+}
+
 
     public String getFileContentType(String filename, Long entityId) throws IOException {
         Path pathProducto = uploadDirPath.resolve("productos").resolve(String.valueOf(entityId)).resolve(filename);
