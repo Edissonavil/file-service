@@ -57,7 +57,7 @@ public class SecurityConfig {
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .authorizeHttpRequests(auth -> auth
             // ⬇⬇ las fotos ahora son públicas
-            .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
 
             // ⬇⬇ PERMITE EL ACCESO A LA RUTA DE ERROR
             .requestMatchers("/error").permitAll() // <-- ¡Añade esta línea!

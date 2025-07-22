@@ -60,40 +60,26 @@ public class FileStorageService {
         }
     }
 
-    public Resource loadAsResource(String filename, Long entityId)
-        throws IOException, NoSuchFileException {
-    // Construye las rutas posibles
-    Path pathProducto = uploadDirPath
-        .resolve("productos")
-        .resolve(entityId.toString())
-        .resolve(filename);
-    Path pathComprobante = uploadDirPath
-        .resolve("comprobantes")
-        .resolve(entityId.toString())
-        .resolve(filename);
-
-    // Busca en productos
-    if (Files.exists(pathProducto) && !Files.isDirectory(pathProducto)) {
-        try {
-            return new UrlResource(pathProducto.toUri());
-        } catch (MalformedURLException e) {
-            throw new IOException(
-                "URL inválida para el fichero de producto: " + pathProducto, e);
-        }
+    public Resource loadAsResource(String filename, Long entityId) throws IOException {
+    // Buscar primero en productos
+    Path productPath = uploadDirPath.resolve("productos")
+                                   .resolve(entityId.toString())
+                                   .resolve(filename);
+    
+    if (Files.exists(productPath)) {
+        return new UrlResource(productPath.toUri());
     }
 
-    // Busca en comprobantes
-    if (Files.exists(pathComprobante) && !Files.isDirectory(pathComprobante)) {
-        try {
-            return new UrlResource(pathComprobante.toUri());
-        } catch (MalformedURLException e) {
-            throw new IOException(
-                "URL inválida para el fichero de comprobante: " + pathComprobante, e);
-        }
+    // Si no está en productos, buscar en comprobantes
+    Path receiptPath = uploadDirPath.resolve("comprobantes")
+                                   .resolve(entityId.toString())
+                                   .resolve(filename);
+    
+    if (Files.exists(receiptPath)) {
+        return new UrlResource(receiptPath.toUri());
     }
 
-    throw new NoSuchFileException(
-        "Archivo no encontrado: " + filename + " para entidad " + entityId);
+    throw new NoSuchFileException("Archivo no encontrado en ninguna ubicación");
 }
 
 
