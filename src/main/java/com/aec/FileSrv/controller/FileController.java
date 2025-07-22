@@ -23,7 +23,7 @@ import java.nio.file.NoSuchFileException;
 
 
 @RestController
-@RequestMapping("/api/files")
+@RequestMapping("/files")
 @RequiredArgsConstructor
 public class FileController {
     private final FileStorageService storage;
