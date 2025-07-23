@@ -4,6 +4,8 @@ import com.aec.FileSrv.dto.FileInfoDto;
 import com.aec.FileSrv.model.StoredFile;
 import com.aec.FileSrv.service.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,7 @@ import java.nio.file.NoSuchFileException;
 @RestController
 @RequestMapping("/api/files")
 @RequiredArgsConstructor
+@Slf4j
 public class FileController {
     private final FileStorageService storage;
 
@@ -32,20 +35,29 @@ public class FileController {
     public ResponseEntity<Resource> serveFile(
             @PathVariable Long entityId,
             @PathVariable String filename) {
+        
+        log.info("🔍 Solicitando archivo: entityId={}, filename={}", entityId, filename);
+        
         try {
             Resource file = storage.loadAsResource(filename, entityId);
             String contentType = storage.getFileContentType(filename, entityId);
+
+            log.info("✅ Archivo encontrado: {}, tipo: {}", filename, contentType);
 
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.getFilename() + "\"")
                     .body(file);
         } catch (NoSuchFileException e) {
+            log.error("❌ Archivo no encontrado: entityId={}, filename={}", entityId, filename);
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Archivo no encontrado: " + filename, e);
         } catch (Exception e) {
+            log.error("💥 Error al servir archivo: entityId={}, filename={}, error={}", entityId, filename, e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al servir el archivo", e);
         }
     }
+    
+
         @PostMapping(path = "/receipts/{orderId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('ROL_CLIENTE')")
     public ResponseEntity<FileInfoDto> uploadReceiptForOrder(
