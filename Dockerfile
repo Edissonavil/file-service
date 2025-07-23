@@ -10,7 +10,8 @@ RUN mvn -B dependency:go-offline
 
 # 2️⃣ Copiamos SOLO el código del micro-servicio
 COPY src src
-RUN mvn -B package -DskipTests            
+RUN mvn -B package -DskipTests
+
 ############################
 # 🚀 Runtime stage (Alpine) #
 ############################
@@ -22,6 +23,9 @@ RUN apk add --no-cache curl
 
 # 4️⃣ Copiamos el JAR generado
 COPY --from=build /app/target/*file*.jar app.jar
+
+# ✅ Copiamos la carpeta uploads del repositorio (solución al problema)
+COPY uploads /app/uploads
 
 EXPOSE 8080
 
