@@ -25,6 +25,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -56,8 +57,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 // 🔓 RUTAS COMPLETAMENTE PÚBLICAS
-                .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/api/files/**").permitAll()
+                // Permitir acceso a archivos por su ID de Google Drive
+                .requestMatchers(HttpMethod.GET, "/api/files/{googleDriveFileId:.+}").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/files/{googleDriveFileId:.+}").permitAll()
+                // Permitir el callback de Google Drive (debe ser público)
+                .requestMatchers(HttpMethod.GET, "/api/files/google-drive/oauth2callback").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/files/google-drive/oauth2callback").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 
@@ -70,6 +75,17 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/files/receipts/**")
                     .hasAuthority("ROL_CLIENTE")
                 
+                // 🔒 Google Drive Authorize (requiere autenticación de tu API)
+                .requestMatchers(HttpMethod.GET, "/api/files/google-drive/authorize").authenticated()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/files/google-drive/authorize").authenticated()
+                // 🔒 Google Drive List (requiere autenticación de tu API)
+                .requestMatchers(HttpMethod.GET, "/api/files/google-drive/list").authenticated()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/files/google-drive/list").authenticated()
+                // 🔒 Google Drive Download (a través de tu API, requiere auth si no se pasa uploaderId)
+                // Se gestiona la autenticación del uploaderId dentro del controlador si es público
+                .requestMatchers(HttpMethod.GET, "/api/files/google-drive/{googleDriveFileId}/download").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/files/google-drive/{googleDriveFileId}/download").permitAll()
+
                 // 🔒 TODO LO DEMÁS
                 .anyRequest().authenticated()
             )
@@ -94,8 +110,11 @@ public class SecurityConfig {
             String requestPath = request.getRequestURI();
             String method = request.getMethod();
             
-            // Si es una petición GET a archivos, no requiere auth
-            if (requestPath.startsWith("/api/files/") && "GET".equals(method)) {
+            // Si es una petición GET a archivos públicos o callback de Google, no requiere auth
+            if (requestPath.startsWith("/api/files/") && "GET".equals(method) &&
+                (requestPath.matches("/api/files/[^/]+$") || // /api/files/{googleDriveFileId}
+                 requestPath.matches("/api/files/google-drive/[^/]+/download.*") || // /api/files/google-drive/{id}/download
+                 requestPath.equals("/api/files/google-drive/oauth2callback"))) {
                 response.setStatus(HttpStatus.OK.value());
                 return;
             }
@@ -118,7 +137,8 @@ public class SecurityConfig {
         CorsConfiguration cfg = new CorsConfiguration();
         cfg.setAllowedOrigins(List.of(
             "https://gateway-production-129e.up.railway.app",
-            "https://aecf-production.up.railway.app"
+            "https://aecf-production.up.railway.app",
+            "https://aecblock.com" // Añadir el origen de JavaScript para CORS
         ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));

@@ -12,8 +12,9 @@ public class StoredFile {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String filename;       // nombre en disco
+    // Nuevo campo para almacenar el ID del archivo en Google Drive
+    @Column(name = "google_drive_file_id", nullable = false, unique = true)
+    private String googleDriveFileId;
 
     @Column(nullable = false)
     private String originalName;   // nombre original
@@ -28,11 +29,11 @@ public class StoredFile {
     private Instant uploadedAt;
 
     @Column(nullable = false)
-    private String uploader;  
-         // nombreUsuario del colaborador
-    @Column(name = "product_id", nullable = true) // Cambiado a true
+    private String uploader;  // nombreUsuario del colaborador
+
+    @Column(name = "product_id", nullable = true)
     private Long productId;
 
-    @Column(name = "order_id", nullable = true) // Cambiado a true
+    @Column(name = "order_id", nullable = true)
     private Long orderId;
 }
