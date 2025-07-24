@@ -14,7 +14,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +26,9 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.NoSuchFileException;
 import java.util.List;
-import java.util.Optional;
+
+import org.springframework.web.servlet.view.RedirectView; // Para redirección más limpia
+
 import java.util.stream.Collectors;
 
 @RestController
@@ -47,15 +48,15 @@ public class FileController {
      * Si las subidas siempre son con la cuenta de servicio (Edissonavil), este flujo es para otra cosa.
      */
     @GetMapping("/google-drive/authorize")
-   // @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Void> authorizeGoogleDrive(@AuthenticationPrincipal Jwt jwt) {
-        String userId = jwt.getSubject();
+    // @PreAuthorize("isAuthenticated()") // Correcto, ya está comentado
+    // *** INICIO DEL CAMBIO CRÍTICO ***
+    public RedirectView authorizeGoogleDrive(@RequestParam(value = "userId", defaultValue = "Edissonavil") String userId) {
+    // *** FIN DEL CAMBIO CRÍTICO ***
         try {
             String authorizationUrl = googleDriveService.getAuthorizationUrl(userId); // Usa el método para usuarios individuales
             log.info("Redirigiendo a la URL de autorización de Google Drive para el usuario {}: {}", userId, authorizationUrl);
-            return ResponseEntity.status(HttpStatus.FOUND)
-                    .header(HttpHeaders.LOCATION, authorizationUrl)
-                    .build();
+            // Usamos RedirectView para una redirección más limpia, sin necesidad de ResponseEntity y HttpHeaders.LOCATION
+            return new RedirectView(authorizationUrl);
         } catch (Exception e) {
             log.error("Error al generar URL de autorización de Google Drive para {}: {}", userId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al iniciar autorización de Google Drive", e);
@@ -99,7 +100,7 @@ public class FileController {
      * @return Una lista de información de archivos.
      */
     @GetMapping("/google-drive/list")
-  //  @PreAuthorize("isAuthenticated()") // O puedes hacer que sea solo para admins si este es solo para el API user.
+    //  @PreAuthorize("isAuthenticated()") // O puedes hacer que sea solo para admins si este es solo para el API user.
     public ResponseEntity<List<FileInfoDto>> listGoogleDriveFiles(
             @RequestParam(value = "q", required = false) String query,
             @RequestParam(value = "folderId", required = false) String folderId) {
@@ -138,8 +139,8 @@ public class FileController {
             Resource file = storage.loadAsResource(googleDriveFileId); // Eliminado uploaderId
             String contentType = storage.getFileContentType(googleDriveFileId);
             String originalName = repo.findByGoogleDriveFileId(googleDriveFileId)
-                                    .map(StoredFile::getOriginalName)
-                                    .orElse("downloaded_file");
+                    .map(StoredFile::getOriginalName)
+                    .orElse("downloaded_file");
 
             log.info("✅ Archivo de Google Drive encontrado: {}, tipo: {}", originalName, contentType);
 
@@ -182,7 +183,7 @@ public class FileController {
     }
 
     @PostMapping(path = "/receipts/{orderId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  //  @PreAuthorize("hasAuthority('ROL_CLIENTE')")
+    //  @PreAuthorize("hasAuthority('ROL_CLIENTE')")
     public ResponseEntity<FileInfoDto> uploadReceiptForOrder(
             @PathVariable Long orderId,
             @RequestPart("file") MultipartFile file,
@@ -190,7 +191,7 @@ public class FileController {
         String uploader = jwt.getSubject();
         UploadFileResponse uploaded = storage.storeReceiptFile(file, uploader, orderId);
         StoredFile savedFile = repo.findByGoogleDriveFileId(uploaded.googleDriveFileId())
-                                   .orElseThrow(() -> new IllegalStateException("Archivo guardado no encontrado en DB"));
+                .orElseThrow(() -> new IllegalStateException("Archivo guardado no encontrado en DB"));
 
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/api/files/download/{googleDriveFileId}")
@@ -212,7 +213,7 @@ public class FileController {
         }
         UploadFileResponse uploaded = storage.storeReceiptFile(file, uploader, entityId);
         StoredFile savedFile = repo.findByGoogleDriveFileId(uploaded.googleDriveFileId())
-                                   .orElseThrow(() -> new IllegalStateException("Archivo guardado no encontrado en DB"));
+                .orElseThrow(() -> new IllegalStateException("Archivo guardado no encontrado en DB"));
 
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/api/files/download/{googleDriveFileId}")
@@ -236,8 +237,8 @@ public class FileController {
             Resource file = storage.loadAsResource(googleDriveFileId);
             String contentType = storage.getFileContentType(googleDriveFileId);
             String originalName = repo.findByGoogleDriveFileId(googleDriveFileId)
-                                    .map(StoredFile::getOriginalName)
-                                    .orElse("downloaded_file");
+                    .map(StoredFile::getOriginalName)
+                    .orElse("downloaded_file");
 
             log.info("✅ Archivo para servir encontrado: {}, tipo: {}", originalName, contentType);
 
