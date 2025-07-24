@@ -47,7 +47,7 @@ public class FileController {
      * Si las subidas siempre son con la cuenta de servicio (Edissonavil), este flujo es para otra cosa.
      */
     @GetMapping("/google-drive/authorize")
-    @PreAuthorize("isAuthenticated()")
+   // @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> authorizeGoogleDrive(@AuthenticationPrincipal Jwt jwt) {
         String userId = jwt.getSubject();
         try {
@@ -99,7 +99,7 @@ public class FileController {
      * @return Una lista de información de archivos.
      */
     @GetMapping("/google-drive/list")
-    @PreAuthorize("isAuthenticated()") // O puedes hacer que sea solo para admins si este es solo para el API user.
+  //  @PreAuthorize("isAuthenticated()") // O puedes hacer que sea solo para admins si este es solo para el API user.
     public ResponseEntity<List<FileInfoDto>> listGoogleDriveFiles(
             @RequestParam(value = "q", required = false) String query,
             @RequestParam(value = "folderId", required = false) String folderId) {
@@ -182,7 +182,7 @@ public class FileController {
     }
 
     @PostMapping(path = "/receipts/{orderId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('ROL_CLIENTE')")
+  //  @PreAuthorize("hasAuthority('ROL_CLIENTE')")
     public ResponseEntity<FileInfoDto> uploadReceiptForOrder(
             @PathVariable Long orderId,
             @RequestPart("file") MultipartFile file,
@@ -200,7 +200,7 @@ public class FileController {
     }
 
     @PostMapping(path = "/secure/{entityId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('ROL_CLIENTE') or hasAuthority('ROL_COLABORADOR')")
+    //@PreAuthorize("hasAuthority('ROL_CLIENTE') or hasAuthority('ROL_COLABORADOR')")
     public ResponseEntity<FileInfoDto> uploadSecure(
             @RequestPart("file") MultipartFile file,
             @AuthenticationPrincipal Jwt jwt,
