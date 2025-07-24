@@ -27,7 +27,7 @@ public class FileStorageService {
 
     // El método loadAsResource ahora descarga desde Google Drive
     // Ya no necesita el uploaderId aquí, el GoogleDriveService lo obtiene de la DB si es necesario.
-    public Resource loadAsResource(String googleDriveFileId) throws IOException { // <-- Eliminado String uploaderId
+ /*    public Resource loadAsResource(String googleDriveFileId) throws IOException { // <-- Eliminado String uploaderId
         log.info("🔍 Solicitando archivo de Google Drive: ID={}", googleDriveFileId);
         Optional<StoredFile> storedFileOpt = repo.findByGoogleDriveFileId(googleDriveFileId);
         if (storedFileOpt.isEmpty()) {
@@ -37,7 +37,7 @@ public class FileStorageService {
         InputStream inputStream = googleDriveService.downloadFile(googleDriveFileId); // <-- Eliminado uploaderId
         return new InputStreamResource(inputStream);
     }
-
+*/
     public String getFileContentType(String googleDriveFileId) {
         return repo.findByGoogleDriveFileId(googleDriveFileId)
                 .map(StoredFile::getFileType)
