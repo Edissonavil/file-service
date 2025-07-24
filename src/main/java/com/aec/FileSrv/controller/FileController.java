@@ -3,9 +3,8 @@ package com.aec.FileSrv.controller;
 import com.aec.FileSrv.Repository.StoredFileRepository;
 import com.aec.FileSrv.dto.FileInfoDto;
 import com.aec.FileSrv.model.StoredFile;
-import com.aec.FileSrv.model.UserGoogleDriveToken; // No directamente usado en el controller, pero puede ser útil.
 import com.aec.FileSrv.service.FileStorageService;
-import com.aec.FileSrv.service.FileStorageService.UploadFileResponse; // Importa la nueva clase de respuesta
+import com.aec.FileSrv.service.FileStorageService.UploadFileResponse;
 import com.aec.FileSrv.service.GoogleDriveService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +27,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.NoSuchFileException;
 import java.util.List;
-import java.util.Optional; // Necesario para .orElseThrow
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -43,34 +42,28 @@ public class FileController {
 
     /**
      * Paso 3.1: Generar la URL de autorización de Google Drive.
-     * El frontend redirigirá al usuario a este endpoint.
-     *
-     * @param jwt El JWT del usuario autenticado para asociar los tokens.
-     * @return Una redirección a la URL de autorización de Google.
+     * Este endpoint es para que **usuarios individuales** autoricen su propia cuenta de Google Drive,
+     * si esa funcionalidad se mantiene para otras operaciones (ej. listar sus propios archivos).
+     * Si las subidas siempre son con la cuenta de servicio (Edissonavil), este flujo es para otra cosa.
      */
     @GetMapping("/google-drive/authorize")
-    @PreAuthorize("isAuthenticated()") // Solo usuarios autenticados pueden iniciar el flujo
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> authorizeGoogleDrive(@AuthenticationPrincipal Jwt jwt) {
         String userId = jwt.getSubject();
         try {
-            String authorizationUrl = googleDriveService.getAuthorizationUrl(userId);
-            log.info("Redirigiendo a la URL de autorización de Google Drive: {}", authorizationUrl);
-            return ResponseEntity.status(HttpStatus.FOUND) // 302 Found
+            String authorizationUrl = googleDriveService.getAuthorizationUrl(userId); // Usa el método para usuarios individuales
+            log.info("Redirigiendo a la URL de autorización de Google Drive para el usuario {}: {}", userId, authorizationUrl);
+            return ResponseEntity.status(HttpStatus.FOUND)
                     .header(HttpHeaders.LOCATION, authorizationUrl)
                     .build();
         } catch (Exception e) {
-            log.error("Error al generar URL de autorización de Google Drive: {}", e.getMessage());
+            log.error("Error al generar URL de autorización de Google Drive para {}: {}", userId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al iniciar autorización de Google Drive", e);
         }
     }
 
     /**
-     * Paso 3.2: Manejar el Callback de Google después de la autorización.
-     * Google redirigirá al usuario a este endpoint con un código de autorización.
-     *
-     * @param code El código de autorización de Google.
-     * @param state El estado (userId) que enviamos inicialmente.
-     * @return Una respuesta indicando éxito o fracaso, y quizás un mensaje para el frontend.
+     * Paso 3.2: Manejar el Callback de Google después de la autorización. (Para usuarios individuales)
      */
     @GetMapping("/google-drive/oauth2callback")
     public ResponseEntity<String> oauth2Callback(@RequestParam("code") String code,
@@ -86,7 +79,7 @@ public class FileController {
         }
 
         try {
-            String accessToken = googleDriveService.exchangeCodeForTokens(code, state);
+            String accessToken = googleDriveService.exchangeCodeForTokens(code, state); // Usa el método para usuarios individuales
             log.info("Tokens de Google Drive obtenidos y guardados para el usuario: {}", state);
             return ResponseEntity.ok("Autorización de Google Drive exitosa para el usuario " + state + ". Puedes cerrar esta ventana.");
         } catch (IOException e) {
@@ -96,35 +89,36 @@ public class FileController {
     }
 
     /**
-     * 4.3: Listar archivos del usuario en Google Drive.
+     * 4.3: Listar archivos de Google Drive.
+     * Si no se especifica un userId, lista los archivos del usuario de la API (Edissonavil).
+     * Si se especifica, y el usuario ha autorizado, podría listar los suyos.
+     * Esta implementación usa el servicio API por defecto.
      *
-     * @param jwt El JWT del usuario autenticado.
      * @param query Opcional: una consulta de búsqueda para Google Drive.
      * @param folderId Opcional: El ID de la carpeta para listar.
      * @return Una lista de información de archivos.
      */
     @GetMapping("/google-drive/list")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("isAuthenticated()") // O puedes hacer que sea solo para admins si este es solo para el API user.
     public ResponseEntity<List<FileInfoDto>> listGoogleDriveFiles(
-            @AuthenticationPrincipal Jwt jwt,
             @RequestParam(value = "q", required = false) String query,
             @RequestParam(value = "folderId", required = false) String folderId) {
-        String userId = jwt.getSubject();
         try {
-            List<com.google.api.services.drive.model.File> googleFiles = googleDriveService.listFiles(userId, query, folderId);
+            // Usa el GoogleDriveService para el usuario API
+            List<com.google.api.services.drive.model.File> googleFiles = googleDriveService.listFiles(query, folderId); // Eliminado userId
             List<FileInfoDto> dtos = googleFiles.stream()
                     .map(gf -> FileInfoDto.builder()
                             .googleDriveFileId(gf.getId())
                             .originalName(gf.getName())
                             .fileType(gf.getMimeType())
                             .size(gf.getSize())
-                            .uploader(userId) // Asumimos que el uploader es el usuario actual
+                            .uploader("Edissonavil") // Aquí el uploader es el usuario de la API
                             .downloadUri(GATEWAY_BASE + "/api/files/download/" + gf.getId()) // URL de descarga simplificada
                             .build())
                     .collect(Collectors.toList());
             return ResponseEntity.ok(dtos);
         } catch (IOException e) {
-            log.error("Error al listar archivos de Google Drive para el usuario {}: {}", userId, e.getMessage());
+            log.error("Error al listar archivos de Google Drive (via API user): {}", e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al listar archivos de Google Drive", e);
         }
     }
@@ -140,7 +134,6 @@ public class FileController {
     public ResponseEntity<Resource> downloadGoogleDriveFile(
             @PathVariable String googleDriveFileId) {
         log.info("🔍 Solicitando descarga de archivo de Google Drive por ID: {}", googleDriveFileId);
-        // El uploaderId se obtiene dentro de FileStorageService.loadAsResource si es necesario.
         try {
             Resource file = storage.loadAsResource(googleDriveFileId); // Eliminado uploaderId
             String contentType = storage.getFileContentType(googleDriveFileId);
@@ -152,7 +145,7 @@ public class FileController {
 
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + originalName + "\"") // "attachment" para forzar descarga
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + originalName + "\"")
                     .body(file);
         } catch (NoSuchFileException e) {
             log.error("❌ Archivo no encontrado en Google Drive: ID={}, Error={}", googleDriveFileId, e.getMessage());
@@ -167,25 +160,24 @@ public class FileController {
 
     // Este endpoint es el que ProductService llama para subir fotos/archivos
     @PostMapping(path = "/public/{entityId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<UploadFileResponse> uploadPublic( // ✅ Cambiado el tipo de retorno a UploadFileResponse
+    public ResponseEntity<UploadFileResponse> uploadPublic(
             @RequestPart("file") MultipartFile file,
-            @RequestPart("uploader") String uploader,
+            @RequestPart("uploader") String uploader, // Aquí el uploader se pasa explícitamente (ej. "PaulinaIsabel")
             @PathVariable Long entityId,
             @RequestParam("type") String type) throws IOException {
 
-        log.warn("🚨 Endpoint público de subida usado. Asegúrate de que el 'uploader' ({}) tenga credenciales de Google Drive configuradas.", uploader);
+        log.warn("🚨 Endpoint público de subida usado. La subida se realizará con las credenciales del usuario de la API (Edissonavil). El 'uploader' ({}) se guardará como metadata.", uploader);
         UploadFileResponse response;
         switch (type.toLowerCase()) {
             case "product":
-                response = storage.storeProductFile(file, uploader, entityId); // Devuelve UploadFileResponse
+                response = storage.storeProductFile(file, uploader, entityId);
                 break;
             case "receipt":
-                response = storage.storeReceiptFile(file, uploader, entityId); // Devuelve UploadFileResponse
+                response = storage.storeReceiptFile(file, uploader, entityId);
                 break;
             default:
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tipo inválido: 'product' o 'receipt'");
         }
-        // Ya no necesitamos buildear una URI porque el FileClient lo hará con el googleDriveFileId.
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -196,20 +188,16 @@ public class FileController {
             @RequestPart("file") MultipartFile file,
             @AuthenticationPrincipal Jwt jwt) throws IOException {
         String uploader = jwt.getSubject();
-        // storage.storeReceiptFile ya devuelve UploadFileResponse, pero el controlador aún espera FileInfoDto
-        // Necesitamos adaptar. Mejor cambiar el método en storage si este endpoint solo necesita FileInfoDto.
-        // O adaptar aquí.
-        UploadFileResponse uploaded = storage.storeReceiptFile(file, uploader, orderId); // Obtiene UploadFileResponse
-        StoredFile savedFile = repo.findByGoogleDriveFileId(uploaded.googleDriveFileId()) // Buscar en DB para convertir a FileInfoDto
+        UploadFileResponse uploaded = storage.storeReceiptFile(file, uploader, orderId);
+        StoredFile savedFile = repo.findByGoogleDriveFileId(uploaded.googleDriveFileId())
                                    .orElseThrow(() -> new IllegalStateException("Archivo guardado no encontrado en DB"));
 
         URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path("/api/files/download/{googleDriveFileId}") // Usamos la nueva ruta de descarga
+                .path("/api/files/download/{googleDriveFileId}")
                 .buildAndExpand(savedFile.getGoogleDriveFileId())
                 .toUri();
         return ResponseEntity.created(location).body(toDto(savedFile));
     }
-
 
     @PostMapping(path = "/secure/{entityId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('ROL_CLIENTE') or hasAuthority('ROL_COLABORADOR')")
@@ -219,7 +207,7 @@ public class FileController {
             @PathVariable Long entityId,
             @RequestParam("type") String type) throws IOException {
         String uploader = jwt.getSubject();
-        if (!"receipt".equalsIgnoreCase(type)) { // Solo comprobantes en este endpoint
+        if (!"receipt".equalsIgnoreCase(type)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Solo se permite type=receipt en este endpoint.");
         }
         UploadFileResponse uploaded = storage.storeReceiptFile(file, uploader, entityId);
@@ -239,17 +227,13 @@ public class FileController {
      * Esto es para que ProductService pueda generar URLs directas en el DTO de Producto.
      * Este endpoint no es para subida, sino para visualización o descarga en línea.
      */
-    @GetMapping("/{googleDriveFileId}") // Simplificado el path variable, antes era "/{googleDriveFileId:.+}"
+    @GetMapping("/{googleDriveFileId}")
     public ResponseEntity<Resource> serveFile(
             @PathVariable String googleDriveFileId) {
         log.info("🔍 Solicitando archivo para servir por ID de Google Drive: {}", googleDriveFileId);
-        // Primero, obtener el uploaderId del StoredFile para el GoogleDriveService
-        String uploaderId = repo.findByGoogleDriveFileId(googleDriveFileId)
-                                .map(StoredFile::getUploader)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Uploader no encontrado para el archivo: " + googleDriveFileId));
-
         try {
-            Resource file = storage.loadAsResource(googleDriveFileId); // Eliminado uploaderId en llamada
+            // El uploaderId no es necesario aquí, ya que la descarga se hace con el usuario de la API
+            Resource file = storage.loadAsResource(googleDriveFileId);
             String contentType = storage.getFileContentType(googleDriveFileId);
             String originalName = repo.findByGoogleDriveFileId(googleDriveFileId)
                                     .map(StoredFile::getOriginalName)
@@ -259,7 +243,7 @@ public class FileController {
 
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + originalName + "\"") // "inline" para visualizar en el navegador
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + originalName + "\"")
                     .body(file);
         } catch (NoSuchFileException e) {
             log.error("❌ Archivo no encontrado: ID={}, error={}", googleDriveFileId, e.getMessage());
@@ -275,20 +259,13 @@ public class FileController {
      * Endpoint para eliminar archivos de Google Drive y de la DB.
      *
      * @param googleDriveFileId El ID del archivo de Google Drive a eliminar.
-     * @param jwt JWT del usuario autenticado (para verificar permisos si es necesario).
      */
     @DeleteMapping("/{googleDriveFileId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteFile(
-            @PathVariable String googleDriveFileId,
-            @AuthenticationPrincipal Jwt jwt) {
+            @PathVariable String googleDriveFileId) { // Eliminado Jwt jwt, la autenticación se maneja a nivel de aplicación (Edissonavil)
         try {
-            // Opcional: obtener el `uploaderId` desde el JWT para asegurar que el usuario
-            // solo pueda borrar sus propios archivos, o si se borra el producto,
-            // que el admin pueda borrarlo.
-            // String requesterId = jwt.getSubject();
-            // storage.deleteFile(googleDriveFileId, requesterId); // Si deleteFile requiere el uploaderId
-            storage.deleteFile(googleDriveFileId); // La implementación actual de deleteFile en FileStorageService ya obtiene el uploaderId de StoredFile
+            storage.deleteFile(googleDriveFileId);
             log.info("Archivo {} eliminado exitosamente.", googleDriveFileId);
         } catch (NoSuchFileException e) {
             log.error("Archivo no encontrado para eliminar: ID={}", googleDriveFileId, e);
@@ -303,7 +280,7 @@ public class FileController {
     private FileInfoDto toDto(StoredFile sf) {
         String downloadUri = UriComponentsBuilder
                 .fromHttpUrl(GATEWAY_BASE)
-                .path("/api/files/download/{googleDriveFileId}") // Usamos la nueva ruta de descarga directa
+                .path("/api/files/download/{googleDriveFileId}")
                 .buildAndExpand(sf.getGoogleDriveFileId())
                 .toUriString();
 

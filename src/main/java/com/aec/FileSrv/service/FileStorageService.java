@@ -1,81 +1,77 @@
-package com.aec.FileSrv.service; // Asegúrate de que el paquete sea correcto
+package com.aec.FileSrv.service;
 
-import com.aec.FileSrv.model.StoredFile;
 import com.aec.FileSrv.Repository.StoredFileRepository;
+import com.aec.FileSrv.model.StoredFile;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.time.Instant;
-import lombok.extern.slf4j.Slf4j;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j 
+@Slf4j
 public class FileStorageService {
 
     private final StoredFileRepository repo;
     private final GoogleDriveService googleDriveService;
+
     public record UploadFileResponse(String googleDriveFileId, String originalFilename) {}
 
-    public Resource loadAsResource(String googleDriveFileId) throws IOException { // Eliminado String uploaderId
+    // El método loadAsResource ahora descarga desde Google Drive
+    // Ya no necesita el uploaderId aquí, el GoogleDriveService lo obtiene de la DB si es necesario.
+    public Resource loadAsResource(String googleDriveFileId) throws IOException { // <-- Eliminado String uploaderId
         log.info("🔍 Solicitando archivo de Google Drive: ID={}", googleDriveFileId);
-        // Primero, obtener el StoredFile para validar el uploader y obtener el uploaderId
         Optional<StoredFile> storedFileOpt = repo.findByGoogleDriveFileId(googleDriveFileId);
         if (storedFileOpt.isEmpty()) {
             throw new NoSuchFileException("Archivo no encontrado en la base de datos: " + googleDriveFileId);
         }
-        StoredFile storedFile = storedFileOpt.get();
-
-        try {
-            InputStream inputStream = googleDriveService.downloadFile(storedFile.getUploader(), googleDriveFileId);
-            return new InputStreamResource(inputStream);
-        } catch (IOException e) {
-            log.error("❌ Error al descargar archivo de Google Drive: ID={}, Error={}", googleDriveFileId, e.getMessage());
-            throw new NoSuchFileException("Archivo no encontrado en Google Drive o error de acceso: " + googleDriveFileId);
-        }
+        // El GoogleDriveService ahora usa las credenciales del usuario API predefinido.
+        InputStream inputStream = googleDriveService.downloadFile(googleDriveFileId); // <-- Eliminado uploaderId
+        return new InputStreamResource(inputStream);
     }
 
     public String getFileContentType(String googleDriveFileId) {
         return repo.findByGoogleDriveFileId(googleDriveFileId)
                 .map(StoredFile::getFileType)
-                .orElse("application/octet-stream"); // Tipo MIME por defecto si no se encuentra
+                .orElse("application/octet-stream");
     }
+
     public UploadFileResponse storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
         String originalFilename = file.getOriginalFilename();
         String mimeType = file.getContentType();
         InputStream fileInputStream = file.getInputStream();
 
-        // Subir a Google Drive
-        String googleDriveFileId = googleDriveService.uploadFile(uploader, fileInputStream, mimeType, originalFilename, null);
+        // Subir a Google Drive usando las credenciales del usuario de la API
+        String googleDriveFileId = googleDriveService.uploadFile(fileInputStream, mimeType, originalFilename, null); // <-- Eliminado uploader y folderId, usa el default
 
         StoredFile sf = new StoredFile();
         sf.setGoogleDriveFileId(googleDriveFileId);
         sf.setOriginalName(originalFilename);
         sf.setFileType(mimeType);
         sf.setSize(file.getSize());
-        sf.setUploader(uploader);
+        sf.setUploader(uploader); // Guardamos el uploader real (colaborador), pero no se usa para GD
         sf.setProductId(productId);
         sf.setUploadedAt(Instant.now());
         sf = repo.save(sf);
         log.info("Archivo de producto guardado en DB con Google Drive ID: {}", googleDriveFileId);
-
-        return new UploadFileResponse(googleDriveFileId, originalFilename); // ✅ Devolver el nuevo record
+        return new UploadFileResponse(googleDriveFileId, originalFilename);
     }
 
-    // ✅ Modificado para devolver UploadFileResponse
     public UploadFileResponse storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
         String originalFilename = file.getOriginalFilename();
         String mimeType = file.getContentType();
         InputStream fileInputStream = file.getInputStream();
 
-        // Subir a Google Drive
-        String googleDriveFileId = googleDriveService.uploadFile(uploader, fileInputStream, mimeType, originalFilename, null);
+        // Subir a Google Drive usando las credenciales del usuario de la API
+        String googleDriveFileId = googleDriveService.uploadFile(fileInputStream, mimeType, originalFilename, null); // <-- Eliminado uploader y folderId, usa el default
 
         StoredFile sf = new StoredFile();
         sf.setGoogleDriveFileId(googleDriveFileId);
@@ -87,22 +83,20 @@ public class FileStorageService {
         sf.setUploadedAt(Instant.now());
         sf = repo.save(sf);
         log.info("Archivo de comprobante guardado en DB con Google Drive ID: {}", googleDriveFileId);
-
-        return new UploadFileResponse(googleDriveFileId, originalFilename); // ✅ Devolver el nuevo record
+        return new UploadFileResponse(googleDriveFileId, originalFilename);
     }
 
-    // Opcional: Método para eliminar archivos de Google Drive y de la DB
-    // ✅ Ajustado el parámetro para que coincida con el uso en ProductService
-    public void deleteFile(String googleDriveFileId) throws IOException { // Eliminado uploaderId
+    public void deleteFile(String googleDriveFileId) throws IOException { // <-- Eliminado String uploaderId
         Optional<StoredFile> storedFileOpt = repo.findByGoogleDriveFileId(googleDriveFileId);
         if (storedFileOpt.isEmpty()) {
             log.warn("Intento de eliminar archivo no encontrado en DB: {}", googleDriveFileId);
-            return; // No hay nada que borrar si no está en la DB
+            return;
         }
         StoredFile storedFile = storedFileOpt.get();
 
-        googleDriveService.deleteFile(storedFile.getUploader(), googleDriveFileId); // Usar el uploader de la DB
-        repo.delete(storedFile); // Eliminar de la DB
+        // El GoogleDriveService ahora usa las credenciales del usuario API predefinido.
+        googleDriveService.deleteFile(googleDriveFileId); // <-- Eliminado uploaderId
+        repo.delete(storedFile);
         log.info("Archivo {} eliminado de Google Drive y DB.", googleDriveFileId);
     }
 }
