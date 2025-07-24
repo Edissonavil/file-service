@@ -8,9 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface StoredFileRepository extends JpaRepository<StoredFile, Long> {
-    Optional<StoredFile> findByFilename(String filename);
+    Optional<StoredFile> findByOriginalName(String originalName); // <-- ¡Correcto ahora!
     List<StoredFile> findByProductId(Long productId);
     Optional<StoredFile> findByGoogleDriveFileId(String googleDriveFileId);
-
-
 }
