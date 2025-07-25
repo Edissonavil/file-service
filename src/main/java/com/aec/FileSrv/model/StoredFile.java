@@ -17,6 +17,9 @@ public class StoredFile {
     private String googleDriveFileId;
 
     @Column(nullable = false)
+    private String filename; 
+
+    @Column(nullable = false)
     private String originalName;   // nombre original
 
     @Column(nullable = false)
@@ -36,4 +39,7 @@ public class StoredFile {
 
     @Column(name = "order_id", nullable = true)
     private Long orderId;
+
+    @Column(nullable = false, unique = true)
+    private String driveFileId;
 }

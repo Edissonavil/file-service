@@ -1,11 +1,5 @@
 package com.aec.FileSrv.config;
 
-import java.util.Base64;
-import java.util.List;
-
-import javax.crypto.spec.SecretKeySpec;
-import javax.crypto.SecretKey;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +17,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+import java.util.List;
 
 @Configuration
 @EnableMethodSecurity
@@ -42,7 +41,6 @@ public class SecurityConfig {
         JwtGrantedAuthoritiesConverter ga = new JwtGrantedAuthoritiesConverter();
         ga.setAuthorityPrefix("");
         ga.setAuthoritiesClaimName("role");
-
         JwtAuthenticationConverter conv = new JwtAuthenticationConverter();
         conv.setJwtGrantedAuthoritiesConverter(ga);
         return conv;
@@ -54,57 +52,21 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                // 🔓 RUTAS COMPLETAMENTE PÚBLICAS
-                // Permitir acceso a archivos por su ID de Google Drive (para descarga/visualización)
-                .requestMatchers(HttpMethod.GET, "/api/files/{googleDriveFileId:.+}").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/api/files/{googleDriveFileId:.+}").permitAll()
-                // Permitir el callback de Google Drive (Google lo llamará sin JWT)
-                .requestMatchers(HttpMethod.GET, "/api/files/google-drive/oauth2callback").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/api/files/google-drive/oauth2callback").permitAll()
-                // Permitir acceso a la página de error (fallback)
+                .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api	files/**").permitAll()
                 .requestMatchers("/error").permitAll()
-                // Permitir acceso al endpoint de salud del actuador
                 .requestMatchers("/actuator/health").permitAll()
-                
-                // 🔓 UPLOADS PÚBLICOS (para ProductService, etc.)
+                .requestMatchers("/api/files/oauth2/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/files/public/**").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/api/files/public/**").permitAll() // Añadido OPTIONS para CORS
-
-                // *** INICIO DEL CAMBIO CRÍTICO TEMPORAL ***
-                // 🔓 Google Drive Authorize: Permitir acceso sin autenticación para iniciar el flujo OAuth
-                .requestMatchers(HttpMethod.GET, "/api/files/google-drive/authorize").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/api/files/google-drive/authorize").permitAll()
-                // *** FIN DEL CAMBIO CRÍTICO TEMPORAL ***
-                
-                // 🔒 UPLOADS SEGUROS
-                .requestMatchers(HttpMethod.POST, "/api/files/secure/**")
-                    .hasAnyAuthority("ROL_CLIENTE", "ROL_COLABORADOR")
-                .requestMatchers(HttpMethod.POST, "/api/files/receipts/**")
-                    .hasAuthority("ROL_CLIENTE")
-                
-                // 🔒 Google Drive List (requiere autenticación de tu API)
-                .requestMatchers(HttpMethod.GET, "/api/files/google-drive/list").authenticated()
-                .requestMatchers(HttpMethod.OPTIONS, "/api/files/google-drive/list").authenticated()
-                // 🔒 Google Drive Download (a través de tu API, requiere auth si no se pasa uploaderId)
-                // Se gestiona la autenticación del uploaderId dentro del controlador si es público
-                .requestMatchers(HttpMethod.GET, "/api/files/google-drive/{googleDriveFileId}/download").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/api/files/google-drive/{googleDriveFileId}/download").permitAll()
-
-                // 🔒 TODO LO DEMÁS
+                .requestMatchers(HttpMethod.POST, "/api/files/secure/**").hasAnyAuthority("ROL_CLIENTE", "ROL_COLABORADOR")
+                .requestMatchers(HttpMethod.POST, "/api/files/receipts/**").hasAuthority("ROL_CLIENTE")
                 .anyRequest().authenticated()
             )
-            // ⚠️ CONFIGURACIÓN CRÍTICA: Solo aplica seguridad donde es necesaria
             .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt
-                    .decoder(jwtDecoder())
-                    .jwtAuthenticationConverter(jwtAuthConverter())
-                )
+                .jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(jwtAuthConverter()))
                 .authenticationEntryPoint(customAuthenticationEntryPoint())
             )
-            .sessionManagement(session -> 
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            );
-        
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
         return http.build();
     }
 
@@ -113,24 +75,14 @@ public class SecurityConfig {
         return (request, response, authException) -> {
             String requestPath = request.getRequestURI();
             String method = request.getMethod();
-            
-            // Si es una petición GET a archivos públicos o callback de Google, no requiere auth
-            if (requestPath.startsWith("/api/files/") && "GET".equals(method) &&
-                (requestPath.matches("/api/files/[^/]+$") || // /api/files/{googleDriveFileId}
-                 requestPath.matches("/api/files/google-drive/[^/]+/download.*") || // /api/files/google-drive/{id}/download
-                 requestPath.equals("/api/files/google-drive/oauth2callback") ||
-                 requestPath.equals("/api/files/google-drive/authorize"))) { // <-- Añadido aquí también para el Custom Entry Point
+            if (requestPath.startsWith("/api/files/") && ("GET".equals(method) || requestPath.startsWith("/api/files/oauth2/"))) {
                 response.setStatus(HttpStatus.OK.value());
                 return;
             }
-            
-            // Si es POST público, tampoco requiere auth
             if (requestPath.startsWith("/api/files/public/") && "POST".equals(method)) {
                 response.setStatus(HttpStatus.OK.value());
                 return;
             }
-            
-            // Para todo lo demás, 401
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.getWriter().write("{\"error\":\"No autorizado\",\"path\":\"" + requestPath + "\"}");
@@ -143,12 +95,11 @@ public class SecurityConfig {
         cfg.setAllowedOrigins(List.of(
             "https://gateway-production-129e.up.railway.app",
             "https://aecf-production.up.railway.app",
-            "https://aecblock.com"
+            "https://production-31f3.up.railway.app"
         ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);
         return source;

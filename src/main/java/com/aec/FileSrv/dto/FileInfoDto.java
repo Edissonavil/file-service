@@ -11,6 +11,6 @@ public class FileInfoDto {
     private Long size;
     private String uploader;
     private String downloadUri;
-    private String googleDriveFileId; // Nuevo campo
+    private String driveFileId;
 
 }

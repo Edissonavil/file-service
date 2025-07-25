@@ -1,8 +1,7 @@
 spring:
   application:
-    name: file-service
+    name: aec-file
 
-  # PostgreSQL datasource
   datasource:
     url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
     username: ${PGUSER}
@@ -22,33 +21,25 @@ spring:
       max-request-size: ${MAX_REQUEST_SIZE:1000MB}
 
 server:
-  port: ${PORT:8080}
+  port: ${PORT:8084}
 
-
-# Ruta de subida de archivos (se puede montar en Railway como volumen si es necesario)
-file:
-  upload-dir: ${UPLOAD_DIR:uploads}
-
-# Seguridad (si aplica JWT en este microservicio también)
 jwt:
   secret: ${JWT_SECRET}
   accessMs: ${JWT_ACCESS_MS:3600000}
   refreshMs: ${JWT_REFRESH_MS:86400000}
+
+google:
+  oauth:
+    client-id: ${GOOGLE_CLIENT_ID}
+    client-secret: ${GOOGLE_CLIENT_SECRET}
+    redirect-uri: https://production-31f3.up.railway.app/api/files/oauth2/callback
+
+gdrive:
+  folder-product-id: 1oq7OFOCkuHWgzIXNRElQT1E9-5Jtx9f2
+  folder-receipt-id: 1YZaBMd6OexyjuOpLf8IfeOJF9fzzw-Be
 
 logging:
   level:
     org.springframework.security: ${LOG_SECURITY_LEVEL:DEBUG}
     org.springframework.web.filter.CommonsRequestLoggingFilter: ${LOG_FILTER_LEVEL:DEBUG}
     root: ${LOG_ROOT_LEVEL:INFO}
-    com.google.api.client.http.HttpLoggingInterceptor: DEBUG
-    org.springframework.security: DEBUG
-
-google:
-  drive:
-    client-id: ${GOOGLE_DRIVE_CLIENT_ID}
-    client-secret: ${GOOGLE_DRIVE_CLIENT_SECRET}
-    redirect-uri: ${GOOGLE_DRIVE_REDIRECT_URI:https://file-service-production-31f3.up.railway.app/api/files/google-drive/oauth2callback}
-    folder-id: ${GOOGLE_DRIVE_FOLDER_ID:1UO1n9SICCKbHRu2gp8_ZAvlROKGECDBg} 
-    api-user:
-      access-token: ${GOOGLE_DRIVE_API_USER_ACCESS_TOKEN:''}
-      refresh-token: ${GOOGLE_DRIVE_API_USER_REFRESH_TOKEN:''}
