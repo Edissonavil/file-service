@@ -74,25 +74,49 @@ public class GoogleDriveService {
     @PostConstruct
 public void init() {
     try {
-        // ORIGINAL: this.httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+ // Restauramos el HttpTransport base
+            this.httpTransport = GoogleNetHttpTransport.newTrustedTransport();
 
-        // TEMPORAL PARA DEPURACIÓN:
-        this.httpTransport = new NetHttpTransport.Builder()
-            .addInterceptor(new HttpLoggingInterceptor(log, true)) // 'true' para incluir headers y body
-            .build();
-        // Esto reemplaza la línea original de GoogleNetHttpTransport.newTrustedTransport();
-        // Mueve cualquier otra configuración de HttpTransport (como proxy) aquí si la tienes.
+            // *** TEMPORAL PARA DEPURACIÓN: Añadir interceptor de logging ***
+            // La forma correcta de añadir HttpLoggingInterceptor es a través de HttpRequestInitializer
+            // Necesitamos un HttpRequestInitializer que envuelva el HttpTransport.
+            // Primero, aseguramos que el log level para com.google.api.client.http.HttpLoggingInterceptor
+            // esté en DEBUG en tu application.yml si quieres ver los detalles.
+            // logging:
+            //   level:
+            //     com.google.api.client.http.HttpLoggingInterceptor: DEBUG
+            //
+            // No se añade directamente al Builder de NetHttpTransport en la forma que lo intentaste.
+            // En su lugar, el HttpLoggingInterceptor es un HttpRequestInitializer que se pasa al builder de Drive.
+            // O, para un logging global, se configura a nivel de HttpTransport si el builder lo permite (NetHttpTransport.Builder().setLoggingEnabled(true) por ejemplo).
+            // Para la versión que estás usando, la forma más compatible es vía HttpRequestInitializer
+            // o configurando directamente el logger de Java.
 
-        if (apiUserRefreshToken != null && !apiUserRefreshToken.isEmpty()) {
-            initializeApiUserDriveService();
-        } else {
-            log.warn("Las credenciales del usuario de la API (Edissonavil) no están completamente configuradas...");
+            // Si quieres ver el log de bajo nivel, no necesitas cambiar el HttpTransport en sí.
+            // Solo asegúrate de que el nivel de log para 'com.google.api.client.http.HttpLoggingInterceptor'
+            // está en DEBUG en tu `application.yml` (como puse en el comentario del código anterior).
+            // La librería de Google ya tiene un mecanismo de logging interno que se activa con niveles de DEBUG.
+            // NO necesitas este bloque de código específico que te está dando error.
+
+            // QUITAMOS LA LINEA QUE TE DIO ERROR Y MANTENEMOS EL ORIGINAL:
+            // this.httpTransport = new NetHttpTransport.Builder()
+            //    .addInterceptor(new HttpLoggingInterceptor(log, true))
+            //    .build();
+
+            // Mantenemos la línea original de inicialización:
+            // this.httpTransport = GoogleNetHttpTransport.newTrustedTransport(); // ESTO YA ESTABA, y es lo correcto.
+
+
+            if (apiUserRefreshToken != null && !apiUserRefreshToken.isEmpty()) {
+                initializeApiUserDriveService();
+            } else {
+                log.warn("Las credenciales del usuario de la API (Edissonavil) no están completamente configuradas...");
+            }
+        } catch (GeneralSecurityException | IOException e) {
+            log.error("Error al inicializar HttpTransport o Drive Service para el usuario API: {}", e.getMessage());
+            throw new RuntimeException("No se pudo inicializar Google Drive Service", e);
         }
-    } catch (GeneralSecurityException | IOException e) {
-        log.error("Error al inicializar HttpTransport o Drive Service para el usuario API: {}", e.getMessage());
-        throw new RuntimeException("No se pudo inicializar Google Drive Service", e);
     }
-}
 
     private void initializeApiUserDriveService() throws IOException {
         log.info("Inicializando Google Drive Service para el usuario de la API (Edissonavil)...");

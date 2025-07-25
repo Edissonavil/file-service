@@ -40,6 +40,8 @@ logging:
     org.springframework.security: ${LOG_SECURITY_LEVEL:DEBUG}
     org.springframework.web.filter.CommonsRequestLoggingFilter: ${LOG_FILTER_LEVEL:DEBUG}
     root: ${LOG_ROOT_LEVEL:INFO}
+    com.google.api.client.http.HttpLoggingInterceptor: DEBUG
+    org.springframework.security: DEBUG
 
 google:
   drive:
