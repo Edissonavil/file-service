@@ -48,5 +48,5 @@ google:
     redirect-uri: ${GOOGLE_DRIVE_REDIRECT_URI:https://file-service-production-31f3.up.railway.app/api/files/google-drive/oauth2callback}
     folder-id: ${GOOGLE_DRIVE_FOLDER_ID:1UO1n9SICCKbHRu2gp8_ZAvlROKGECDBg} 
     api-user:
-      access-token: ${GOOGLE_DRIVE_API_USER_ACCESS_TOKEN:#{null}}
-      refresh-token: ${GOOGLE_DRIVE_API_USER_REFRESH_TOKEN:#{null}}
+      access-token: ${GOOGLE_DRIVE_API_USER_ACCESS_TOKEN:#{}}
+      refresh-token: ${GOOGLE_DRIVE_API_USER_REFRESH_TOKEN:#{}}
