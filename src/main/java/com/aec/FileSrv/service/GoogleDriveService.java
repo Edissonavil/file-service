@@ -68,6 +68,8 @@ public class GoogleDriveService {
     
     private Drive apiDriveService;
 
+    private String apiUserAccessTokenString;
+
     public GoogleDriveService(UserGoogleDriveTokenRepository tokenRepository) {
         this.tokenRepository = tokenRepository;
     }
@@ -90,36 +92,45 @@ public class GoogleDriveService {
         }
     }
 
-    private void initializeApiUserDriveService() throws IOException {
-        // No verificamos si los tokens están vacíos aquí, ya que el @PostConstruct lo hizo.
-        // Aquí asumimos que apiUserAccessToken y apiUserRefreshToken ya tienen un valor.
-        log.info("Inicializando Google Drive Service para el usuario de la API (Edissonavil)...");
+private void initializeApiUserDriveService() throws IOException {
+    log.info("Inicializando Google Drive Service para el usuario de la API (Edissonavil)...");
 
-        UserCredentials credentials = UserCredentials.newBuilder()
-            .setClientId(clientId)
-            .setClientSecret(clientSecret)
-            .setRefreshToken(apiUserRefreshToken)
-            .setAccessToken(apiUserAccessToken) 
-            .build();
-
-        try {
-            credentials.refreshAccessToken(); 
-            log.info("Access Token del usuario de la API refrescado exitosamente al iniciar el servicio.");
-        } catch (IOException e) {
-            log.error("Error al refrescar el Access Token del usuario de la API al iniciar: {}. Asegúrate que el Refresh Token es válido. Las subidas directas no funcionarán.", e.getMessage());
-            // No lanzamos la excepción aquí, solo loggeamos, para permitir que el servicio arranque.
-            // Pero las operaciones de Drive que usen apiDriveService fallarán.
-            return; // Salimos si el refresh falla. apiDriveService seguirá siendo null.
-        }
-
-        Credential apiCredential = new Credential(BearerToken.authorizationHeaderAccessMethod())
-            .setAccessToken(credentials.getAccessToken().getTokenValue());
-        
-        this.apiDriveService = new Drive.Builder(httpTransport, JSON_FACTORY, apiCredential)
-                .setApplicationName("AEC File Service")
-                .build();
-        log.info("Servicio de Google Drive para el usuario de la API inicializado.");
+    // Construye el AccessToken y RefreshToken a partir de las cadenas
+    AccessToken initialAccessToken = null;
+    if (apiUserAccessTokenString != null && !apiUserAccessTokenString.isEmpty()) {
+        initialAccessToken = new AccessToken(apiUserAccessTokenString, null); // El segundo parámetro es expiryTime, lo dejamos en null para que lo refresque
     }
+
+    // Nota: UserCredentials manejará el refresh token por sí mismo, así que solo le pasamos la cadena del refresh token.
+    UserCredentials credentials = UserCredentials.newBuilder()
+        .setClientId(clientId)
+        .setClientSecret(clientSecret)
+        .setRefreshToken(apiUserRefreshToken) // Esto es correcto, es un String
+        .setAccessToken(initialAccessToken) // Pasa el objeto AccessToken que acabamos de construir
+        .build();
+
+    try {
+        // Al llamar a refreshAccessToken, se actualizarán los valores internos de AccessToken y RefreshToken
+        credentials.refreshAccessToken(); 
+        log.info("Access Token del usuario de la API refrescado exitosamente al iniciar el servicio.");
+        // Después de refrescar, actualiza el apiUserAccessTokenString con el nuevo access token
+        this.apiUserAccessTokenString = credentials.getAccessToken().getTokenValue(); // Guarda el nuevo access token
+        // Opcional: Si quieres guardar el refresh token actualizado (si Google lo envía), aunque no suele cambiar
+        // this.apiUserRefreshToken = credentials.getRefreshToken(); 
+
+    } catch (IOException e) {
+        log.error("Error al refrescar el Access Token del usuario de la API al iniciar: {}. Asegúrate que el Refresh Token es válido. Las subidas directas no funcionarán.", e.getMessage());
+        return; // Salimos si el refresh falla. apiDriveService seguirá siendo null.
+    }
+
+    Credential apiCredential = new Credential(BearerToken.authorizationHeaderAccessMethod())
+        .setAccessToken(credentials.getAccessToken().getTokenValue()); // Usa el token refrescado
+    
+    this.apiDriveService = new Drive.Builder(httpTransport, JSON_FACTORY, apiCredential)
+            .setApplicationName("AEC File Service")
+            .build();
+    log.info("Servicio de Google Drive para el usuario de la API inicializado.");
+}
 
     // --- Métodos del flujo OAuth para usuarios individuales (NO COMENTAR ESTOS) ---
     // Estos son necesarios para que puedas obtener los tokens de Edissonavil.
