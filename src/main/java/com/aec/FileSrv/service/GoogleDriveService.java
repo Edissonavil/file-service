@@ -11,6 +11,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.http.InputStreamContent;
+import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.services.drive.Drive;
@@ -71,19 +72,27 @@ public class GoogleDriveService {
     // }
 
     @PostConstruct
-    public void init() {
-        try {
-            this.httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-            if (apiUserRefreshToken != null && !apiUserRefreshToken.isEmpty()) {
-                initializeApiUserDriveService();
-            } else {
-                log.warn("Las credenciales del usuario de la API (Edissonavil) no están completamente configuradas. Las operaciones que dependen de ellas (subida/descarga/listado directo) no funcionarán hasta que se configuren.");
-            }
-        } catch (GeneralSecurityException | IOException e) {
-            log.error("Error al inicializar HttpTransport o Drive Service para el usuario API: {}", e.getMessage());
-            throw new RuntimeException("No se pudo inicializar Google Drive Service", e);
+public void init() {
+    try {
+        // ORIGINAL: this.httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+
+        // TEMPORAL PARA DEPURACIÓN:
+        this.httpTransport = new NetHttpTransport.Builder()
+            .addInterceptor(new HttpLoggingInterceptor(log, true)) // 'true' para incluir headers y body
+            .build();
+        // Esto reemplaza la línea original de GoogleNetHttpTransport.newTrustedTransport();
+        // Mueve cualquier otra configuración de HttpTransport (como proxy) aquí si la tienes.
+
+        if (apiUserRefreshToken != null && !apiUserRefreshToken.isEmpty()) {
+            initializeApiUserDriveService();
+        } else {
+            log.warn("Las credenciales del usuario de la API (Edissonavil) no están completamente configuradas...");
         }
+    } catch (GeneralSecurityException | IOException e) {
+        log.error("Error al inicializar HttpTransport o Drive Service para el usuario API: {}", e.getMessage());
+        throw new RuntimeException("No se pudo inicializar Google Drive Service", e);
     }
+}
 
     private void initializeApiUserDriveService() throws IOException {
         log.info("Inicializando Google Drive Service para el usuario de la API (Edissonavil)...");
