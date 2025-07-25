@@ -1,12 +1,12 @@
 package com.aec.FileSrv.service;
 
-import com.aec.FileSrv.Repository.UserGoogleDriveTokenRepository;
 import com.aec.FileSrv.model.UserGoogleDriveToken;
-
+import com.aec.FileSrv.Repository.UserGoogleDriveTokenRepository;
 import com.google.api.client.auth.oauth2.BearerToken;
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
+import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets.Details; // Import this!
 import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
 import com.google.api.client.http.HttpTransport;
@@ -21,22 +21,23 @@ import com.google.auth.oauth2.AccessToken;
 import com.google.auth.oauth2.UserCredentials;
 
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.io.InputStream;
-import java.util.Optional;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class GoogleDriveService {
 
     @Value("${google.drive.client-id}")
@@ -48,40 +49,32 @@ public class GoogleDriveService {
     @Value("${google.drive.redirect-uri}")
     private String redirectUri;
 
-    // Asegúrate de que este ID de carpeta sea correcto y que el API user tenga acceso
-    @Value("${google.drive.folder-id:}") 
+    @Value("${google.drive.folder-id:}")
     private String defaultFolderId;
 
-    // --- TEMPORAL: Hacemos que estas variables sean opcionales para que el servicio arranque ---
-    // Usamos :'' para que si no están definidas, el valor por defecto sea una cadena vacía,
-    // evitando el error 'Could not resolve placeholder'.
-    @Value("${google.drive.api-user.access-token:}") 
-    private AccessToken apiUserAccessToken;
+    @Value("${google.drive.api-user.access-token:}")
+    private String apiUserAccessTokenString;
 
-    @Value("${google.drive.api-user.refresh-token:}") 
+    @Value("${google.drive.api-user.refresh-token:}")
     private String apiUserRefreshToken;
 
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private HttpTransport httpTransport;
 
     private final UserGoogleDriveTokenRepository tokenRepository;
-    
+
     private Drive apiDriveService;
 
-    private String apiUserAccessTokenString;
-
-    public GoogleDriveService(UserGoogleDriveTokenRepository tokenRepository) {
-        this.tokenRepository = tokenRepository;
-    }
+    // The constructor is handled by @RequiredArgsConstructor
+    // public GoogleDriveService(UserGoogleDriveTokenRepository tokenRepository) {
+    //     this.tokenRepository = tokenRepository;
+    // }
 
     @PostConstruct
     public void init() {
         try {
             this.httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-            // Solo intentar inicializar el servicio de API user si los tokens están presentes.
-            // Esto permite que el servicio arranque incluso si las variables de entorno aún no están configuradas.
-            if (
-                apiUserRefreshToken != null && !apiUserRefreshToken.isEmpty()) {
+            if (apiUserRefreshToken != null && !apiUserRefreshToken.isEmpty()) {
                 initializeApiUserDriveService();
             } else {
                 log.warn("Las credenciales del usuario de la API (Edissonavil) no están completamente configuradas. Las operaciones que dependen de ellas (subida/descarga/listado directo) no funcionarán hasta que se configuren.");
@@ -92,55 +85,52 @@ public class GoogleDriveService {
         }
     }
 
-private void initializeApiUserDriveService() throws IOException {
-    log.info("Inicializando Google Drive Service para el usuario de la API (Edissonavil)...");
+    private void initializeApiUserDriveService() throws IOException {
+        log.info("Inicializando Google Drive Service para el usuario de la API (Edissonavil)...");
 
-    // Construye el AccessToken y RefreshToken a partir de las cadenas
-    AccessToken initialAccessToken = null;
-    if (apiUserAccessTokenString != null && !apiUserAccessTokenString.isEmpty()) {
-        initialAccessToken = new AccessToken(apiUserAccessTokenString, null); // El segundo parámetro es expiryTime, lo dejamos en null para que lo refresque
+        AccessToken initialAccessToken = null;
+        if (apiUserAccessTokenString != null && !apiUserAccessTokenString.isEmpty()) {
+            initialAccessToken = new AccessToken(apiUserAccessTokenString, null);
+        }
+
+        UserCredentials credentials = UserCredentials.newBuilder()
+                .setClientId(clientId)
+                .setClientSecret(clientSecret)
+                .setRefreshToken(apiUserRefreshToken)
+                .setAccessToken(initialAccessToken)
+                .build();
+
+        try {
+            credentials.refreshAccessToken();
+            log.info("Access Token del usuario de la API refrescado exitosamente al iniciar el servicio.");
+            this.apiUserAccessTokenString = credentials.getAccessToken().getTokenValue();
+
+        } catch (IOException e) {
+            log.error("Error al refrescar el Access Token del usuario de la API al iniciar: {}. Asegúrate que el Refresh Token es válido. Las subidas directas no funcionarán.", e.getMessage());
+            this.apiDriveService = null;
+            return;
+        }
+
+        Credential apiCredential = new Credential(BearerToken.authorizationHeaderAccessMethod())
+                .setAccessToken(credentials.getAccessToken().getTokenValue());
+
+        this.apiDriveService = new Drive.Builder(httpTransport, JSON_FACTORY, apiCredential)
+                .setApplicationName("AEC File Service")
+                .build();
+        log.info("Servicio de Google Drive para el usuario de la API inicializado.");
     }
 
-    // Nota: UserCredentials manejará el refresh token por sí mismo, así que solo le pasamos la cadena del refresh token.
-    UserCredentials credentials = UserCredentials.newBuilder()
-        .setClientId(clientId)
-        .setClientSecret(clientSecret)
-        .setRefreshToken(apiUserRefreshToken) // Esto es correcto, es un String
-        .setAccessToken(initialAccessToken) // Pasa el objeto AccessToken que acabamos de construir
-        .build();
-
-    try {
-        // Al llamar a refreshAccessToken, se actualizarán los valores internos de AccessToken y RefreshToken
-        credentials.refreshAccessToken(); 
-        log.info("Access Token del usuario de la API refrescado exitosamente al iniciar el servicio.");
-        // Después de refrescar, actualiza el apiUserAccessTokenString con el nuevo access token
-        this.apiUserAccessTokenString = credentials.getAccessToken().getTokenValue(); // Guarda el nuevo access token
-        // Opcional: Si quieres guardar el refresh token actualizado (si Google lo envía), aunque no suele cambiar
-        // this.apiUserRefreshToken = credentials.getRefreshToken(); 
-
-    } catch (IOException e) {
-        log.error("Error al refrescar el Access Token del usuario de la API al iniciar: {}. Asegúrate que el Refresh Token es válido. Las subidas directas no funcionarán.", e.getMessage());
-        return; // Salimos si el refresh falla. apiDriveService seguirá siendo null.
-    }
-
-    Credential apiCredential = new Credential(BearerToken.authorizationHeaderAccessMethod())
-        .setAccessToken(credentials.getAccessToken().getTokenValue()); // Usa el token refrescado
-    
-    this.apiDriveService = new Drive.Builder(httpTransport, JSON_FACTORY, apiCredential)
-            .setApplicationName("AEC File Service")
-            .build();
-    log.info("Servicio de Google Drive para el usuario de la API inicializado.");
-}
-
-    // --- Métodos del flujo OAuth para usuarios individuales (NO COMENTAR ESTOS) ---
-    // Estos son necesarios para que puedas obtener los tokens de Edissonavil.
+    // --- Métodos del flujo OAuth para usuarios individuales ---
     public String getAuthorizationUrl(String userId) {
+        // --- START FIX ---
         GoogleClientSecrets clientSecrets = new GoogleClientSecrets();
-        GoogleClientSecrets.Details details = new GoogleClientSecrets.Details();
+        Details details = new Details();
         details.setClientId(clientId);
         details.setClientSecret(clientSecret);
-        clientSecrets.setWeb(details);
-        
+        details.setRedirectUris(Collections.singletonList(redirectUri)); // Correct way to set redirect URIs
+        clientSecrets.setWeb(details); // Set the 'web' part of the client secrets
+        // --- END FIX ---
+
         List<String> scopes = Collections.singletonList(DriveScopes.DRIVE_FILE);
 
         GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
@@ -148,23 +138,26 @@ private void initializeApiUserDriveService() throws IOException {
                 .setAccessType("offline")
                 .setApprovalPrompt("force")
                 .build();
-        
+
         return flow.newAuthorizationUrl()
                 .setRedirectUri(redirectUri)
-                .setState(userId) 
+                .setState(userId)
                 .setAccessType("offline")
                 .build();
     }
 
     @Transactional
     public String exchangeCodeForTokens(String code, String state) throws IOException {
-        String userId = state; 
+        String userId = state;
+        // --- START FIX ---
         GoogleClientSecrets clientSecrets = new GoogleClientSecrets();
-        GoogleClientSecrets.Details details = new GoogleClientSecrets.Details();
+        Details details = new Details();
         details.setClientId(clientId);
         details.setClientSecret(clientSecret);
-        clientSecrets.setWeb(details);
-        
+        details.setRedirectUris(Collections.singletonList(redirectUri)); // Correct way to set redirect URIs
+        clientSecrets.setWeb(details); // Set the 'web' part of the client secrets
+        // --- END FIX ---
+
         List<String> scopes = Collections.singletonList(DriveScopes.DRIVE_FILE);
 
         GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
@@ -187,18 +180,14 @@ private void initializeApiUserDriveService() throws IOException {
         userToken.setRefreshToken(credential.getRefreshToken());
         userToken.setTokenCreationTime(Instant.now());
         userToken.setExpiresInSeconds(credential.getExpiresInSeconds());
-        userToken.setScope(String.join(" ", Collections.singletonList(DriveScopes.DRIVE_FILE))); 
+        userToken.setScope(String.join(" ", Collections.singletonList(DriveScopes.DRIVE_FILE)));
 
         tokenRepository.save(userToken);
         log.info("Tokens de Google Drive guardados para el usuario: {}", userId);
         return credential.getAccessToken();
     }
-    // FIN: Métodos del flujo OAuth para usuarios individuales
-
+    // ... (rest of your methods)
     // --- Métodos que SIEMPRE usarán la cuenta de la API (Edissonavil) ---
-    // NO COMENTAR ESTOS. Si apiDriveService es null (porque los tokens no se configuraron al inicio),
-    // estos métodos lanzarán una IllegalStateException, que es el comportamiento esperado
-    // hasta que los tokens se configuren correctamente.
     public String uploadFile(InputStream fileContent, String mimeType, String fileName, String parentFolderId) throws IOException {
         if (this.apiDriveService == null) {
             throw new IllegalStateException("Google Drive Service para el usuario de la API no está inicializado. Faltan credenciales.");
