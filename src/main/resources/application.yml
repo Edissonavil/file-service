@@ -48,7 +48,9 @@ logging:
 management:
   endpoints:
     web:
+      base-path: /management
       exposure:
-        include: health,info,metrics,gateway,mappings
-
-
+        include: health,info,metrics,gateway,mappings,env,beans
+  endpoint:
+    health:
+      show-details: always

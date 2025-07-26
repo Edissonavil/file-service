@@ -22,7 +22,6 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
 import java.util.List;
-
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -52,40 +51,65 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
+                // Actuator / management
+                .requestMatchers("/management/**", "/actuator/**").permitAll()
+
+                // Público para ficheros y OAuth2
                 .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/api/files/**").permitAll()
-                .requestMatchers("/error").permitAll()
-                .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/files/oauth2/**").permitAll()
+
+                // Otros públicos
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/favicon.ico").permitAll()
+
+                // Uploads
                 .requestMatchers(HttpMethod.POST, "/api/files/public/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/files/secure/**").hasAnyAuthority("ROL_CLIENTE", "ROL_COLABORADOR")
-                .requestMatchers(HttpMethod.POST, "/api/files/receipts/**").hasAuthority("ROL_CLIENTE")
+                .requestMatchers(HttpMethod.POST, "/api/files/secure/**")
+                    .hasAnyAuthority("ROL_CLIENTE", "ROL_COLABORADOR")
+                .requestMatchers(HttpMethod.POST, "/api/files/receipts/**")
+                    .hasAuthority("ROL_CLIENTE")
+
+                // Resto autenticado
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(jwtAuthConverter()))
+                .jwt(jwt -> jwt
+                    .decoder(jwtDecoder())
+                    .jwtAuthenticationConverter(jwtAuthConverter())
+                )
                 .authenticationEntryPoint(customAuthenticationEntryPoint())
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
         return http.build();
     }
 
     @Bean
     public AuthenticationEntryPoint customAuthenticationEntryPoint() {
         return (request, response, authException) -> {
-            String requestPath = request.getRequestURI();
+            String path = request.getRequestURI();
             String method = request.getMethod();
-            if (requestPath.startsWith("/api/files/") && ("GET".equals(method) || requestPath.startsWith("/api/files/oauth2/"))) {
+
+            // Estas rutas ya están permitAll, pero si por alguna razón pasan por aquí, aseguramos 401 solo en lo privado.
+            boolean isPublic =
+                    path.startsWith("/management/") ||
+                    path.startsWith("/actuator/")  ||
+                    path.startsWith("/api/files/oauth2/") ||
+                    (path.startsWith("/api/files/") && "GET".equals(method)) ||
+                    (path.startsWith("/api/files/public/") && "POST".equals(method)) ||
+                    path.equals("/error") ||
+                    path.equals("/favicon.ico");
+
+            if (isPublic) {
+                // Si llega aquí y era pública, devolvemos 200 para no romper UX
                 response.setStatus(HttpStatus.OK.value());
                 return;
             }
-            if (requestPath.startsWith("/api/files/public/") && "POST".equals(method)) {
-                response.setStatus(HttpStatus.OK.value());
-                return;
-            }
+
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getWriter().write("{\"error\":\"No autorizado\",\"path\":\"" + requestPath + "\"}");
+            response.getWriter().write("{\"error\":\"No autorizado\",\"path\":\"" + path + "\"}");
         };
     }
 
@@ -95,11 +119,12 @@ public class SecurityConfig {
         cfg.setAllowedOrigins(List.of(
             "https://gateway-production-129e.up.railway.app",
             "https://aecf-production.up.railway.app",
-            "https://production-31f3.up.railway.app"
+            "https://file-service-production-31f3.up.railway.app"
         ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);
         return source;
