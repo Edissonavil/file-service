@@ -45,3 +45,10 @@ logging:
     org.springframework.web.filter.CommonsRequestLoggingFilter: ${LOG_FILTER_LEVEL:DEBUG}
     root: ${LOG_ROOT_LEVEL:INFO}
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway,mappings
+
+

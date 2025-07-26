@@ -53,7 +53,7 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/api/files/**").permitAll()
-                .requestMatchers(HttpMethod.OPTIONS, "/api	files/**").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/api/files/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/files/oauth2/**").permitAll()
