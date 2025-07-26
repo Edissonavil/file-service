@@ -25,22 +25,23 @@ server:
 
 jwt:
   secret: ${JWT_SECRET}
-  accessMs: ${JWT_ACCESS_MS:3600000}
+  accessMs: ${JWT_ACCESS_MS:36000000}
   refreshMs: ${JWT_REFRESH_MS:86400000}
 
 google:
   oauth:
     client-id: ${GOOGLE_CLIENT_ID}
     client-secret: ${GOOGLE_CLIENT_SECRET}
-    redirect-uri: https://production-31f3.up.railway.app/api/files/oauth2/callback
+    redirect-uri: ${GOOGLE_REDIRECT_URI}
 
 gdrive:
-  folder-product-id: 1oq7OFOCkuHWgzIXNRElQT1E9-5Jtx9f2
-  folder-receipt-id: 1YZaBMd6OexyjuOpLf8IfeOJF9fzzw-Be
+  folder-product-id: ${GDRIVE_FOLDER_PRODUCT_ID}
+  folder-receipt-id: ${GDRIVE_FOLDER_RECEIPT_ID}
+  refresh-token: ${GOOGLE_REFRESH_TOKEN:}   
 
 logging:
   level:
     org.springframework.security: ${LOG_SECURITY_LEVEL:DEBUG}
     org.springframework.web.filter.CommonsRequestLoggingFilter: ${LOG_FILTER_LEVEL:DEBUG}
     root: ${LOG_ROOT_LEVEL:INFO}
-    
+
