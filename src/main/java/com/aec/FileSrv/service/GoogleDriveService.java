@@ -47,9 +47,10 @@ public class GoogleDriveService {
             .execute()
             .getFiles();
     }
+    
+    public void deleteFile(String fileId) throws IOException {
+    drive.files().delete(fileId).execute();
+}
 
-    public void deleteFile(String driveFileId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'deleteFile'");
-    }
+
 }
