@@ -5,7 +5,9 @@ import com.aec.FileSrv.dto.FileInfoDto;
 import com.aec.FileSrv.model.StoredFile;
 import com.aec.FileSrv.service.FileStorageService;
 import com.aec.FileSrv.service.GoogleDriveService;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +17,8 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -28,6 +32,7 @@ public class FileController {
     private final FileStorageService storage;
     private final StoredFileRepository repo;
     private final GoogleDriveService drive;
+    private final Logger log = LoggerFactory.getLogger(FileController.class);
 
     private static final String GATEWAY_BASE = "https://gateway-production-129e.up.railway.app";
 
@@ -44,6 +49,9 @@ public class FileController {
         FileInfoDto saved = isProduct
                 ? storage.storeProductFile(file, uploader, entityId)
                 : storage.storeReceiptFile(file, uploader, entityId);
+
+           log.info("uploadPublic -> pre-build dto: id={}, driveFileId={}, filename={}",
+            saved.getId(), saved.getDriveFileId(), saved.getFilename());
 
         String downloadViaGateway = UriComponentsBuilder
                 .fromHttpUrl(GATEWAY_BASE)

@@ -39,11 +39,13 @@ public class FileStorageService {
     }
 
     public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
-        String driveId = drive.uploadFile(file, true);
-        StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
+    String driveId = drive.uploadFile(file, true);
+    log.info("storeProductFile -> subido a Drive. driveId={}", driveId);
+    StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
+    log.info("storeProductFile -> guardado DB. storedFile.id={}, driveId={}", sf.getId(), sf.getDriveFileId());
+    return toDto(sf);
+}
 
-        return toDto(sf);
-    }
 
     public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
         String driveId = drive.uploadFile(file, false);
