@@ -122,4 +122,14 @@ public class FileController {
                 storage.streamProductZipFromDrive(productId, response.getOutputStream());
         }
 
+        @GetMapping("/meta/product/{productId}")
+public List<FileInfoDto> getMetaByProduct(@PathVariable Long productId) {
+    // Devuelve todos los archivos asociados a ese producto con su fileType y originalName
+    return repo.findByProductId(productId)
+            .stream()
+            .map(storage::toDto)   // ya tienes toDto(StoredFile)
+            .toList();
+}
+
+
 }
