@@ -41,9 +41,11 @@ gdrive:
 
 logging:
   level:
+    com.aec.FileSrv: DEBUG
     org.springframework.security: ${LOG_SECURITY_LEVEL:DEBUG}
     org.springframework.web.filter.CommonsRequestLoggingFilter: ${LOG_FILTER_LEVEL:DEBUG}
     root: ${LOG_ROOT_LEVEL:INFO}
+
 
 management:
   endpoints:
