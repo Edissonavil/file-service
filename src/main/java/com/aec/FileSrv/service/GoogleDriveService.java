@@ -2,6 +2,7 @@ package com.aec.FileSrv.service;
 
 import com.aec.FileSrv.config.DriveProperties;
 import com.aec.FileSrv.controller.FileController;
+import com.aec.FileSrv.drive.DriveFile;
 import com.google.api.client.http.FileContent;
 import com.google.api.client.http.InputStreamContent;
 import com.google.api.services.drive.Drive;
@@ -24,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -136,7 +138,70 @@ public String uploadFileToFolder(MultipartFile mf, String folderId) throws IOExc
     return uploaded.getId();
 }
 
+ public String getOrCreateFolder(String path) throws IOException {
+        String[] parts = path.split("/");
+        String parentId = "root";
 
+        for (String part : parts) {
+            String folderId = findChildFolderId(parentId, part);
+            if (folderId == null) {
+                folderId = createFolder(parentId, part);
+            }
+            parentId = folderId;
+        }
+        return parentId;
+    }
 
+    private String findChildFolderId(String parentId, String name) throws IOException {
+        String q = "'" + parentId + "' in parents and mimeType='application/vnd.google-apps.folder' " +
+                "and name='" + name.replace("'", "\\'") + "' and trashed=false";
+        FileList result = drive.files().list()
+                .setQ(q)
+                .setFields("files(id, name)")
+                .execute();
+        if (result.getFiles() == null || result.getFiles().isEmpty()) return null;
+        return result.getFiles().get(0).getId();
+    }
+
+    private String createFolder(String parentId, String name) throws IOException {
+        File metadata = new File()
+                .setName(name)
+                .setMimeType("application/vnd.google-apps.folder")
+                .setParents(List.of(parentId));
+        File folder = drive.files().create(metadata)
+                .setFields("id")
+                .execute();
+        return folder.getId();
+    }
+
+    /** Lista archivos regulares dentro de un folder */
+    public List<DriveFile> listFilesInFolder(String folderId) throws IOException {
+        String q = "'" + folderId + "' in parents and trashed=false " +
+                "and mimeType != 'application/vnd.google-apps.folder'";
+
+        List<DriveFile> out = new ArrayList<>();
+        String pageToken = null;
+        do {
+            FileList result = drive.files().list()
+                    .setQ(q)
+                    .setFields("nextPageToken, files(id, name, mimeType, size)")
+                    .setPageToken(pageToken)
+                    .execute();
+
+            if (result.getFiles() != null) {
+                for (File f : result.getFiles()) {
+                    out.add(new DriveFile(
+                            f.getId(),
+                            f.getName(),
+                            f.getMimeType(),
+                            f.getSize()
+                    ));
+                }
+            }
+            pageToken = result.getNextPageToken();
+        } while (pageToken != null);
+
+        return out;
+    }
 
 }

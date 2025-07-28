@@ -1,19 +1,25 @@
 package com.aec.FileSrv.service;
 
 import com.aec.FileSrv.Repository.StoredFileRepository;
+import com.aec.FileSrv.drive.DriveFile;
 import com.aec.FileSrv.dto.FileInfoDto;
 import com.aec.FileSrv.model.StoredFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import okio.internal.ZipEntry;
+
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.zip.ZipOutputStream;
 
 @Service
 @RequiredArgsConstructor
@@ -57,6 +63,34 @@ public class FileStorageService {
         StoredFile sf = saveStoredFile(file, uploader, null, orderId, driveId);
         return toDto(sf);
     }
+public void streamProductZipFromDrive(Long productId, OutputStream os) throws IOException {
+        String folderName = "productos/" + productId;
+        String folderId = drive.getOrCreateFolder(folderName);
+
+        var files = drive.listFilesInFolder(folderId);
+
+        try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(os))) {
+            boolean added = false;
+
+            for (DriveFile f : files) {
+                // si quieres excluir imágenes del ZIP, descomenta:
+                // if (f.getMimeType() != null && f.getMimeType().startsWith("image/")) continue;
+
+                added = true;
+                zos.putNextEntry(new java.util.zip.ZipEntry(f.getName()));
+                try (InputStream in = drive.downloadFile(f.getId())) {
+                    in.transferTo(zos);
+                }
+                zos.closeEntry();
+            }
+
+            if (!added) {
+                throw new IOException("No hay archivos descargables en carpeta: " + folderName);
+            }
+            zos.finish();
+        }
+    }
+
 
     private StoredFile saveStoredFile(MultipartFile file, String uploader,
             Long productId, Long orderId, String driveId) throws IOException {
