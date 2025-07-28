@@ -38,63 +38,32 @@ public class FileStorageService {
                 .orElse("application/octet-stream");
     }
 
-  public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
-        try {
-            log.info("storeProductFile: originalName={}, contentType={}, size={}, productId={}",
-                    file != null ? file.getOriginalFilename() : "null",
-                    file != null ? file.getContentType() : "null",
-                    file != null ? file.getSize() : -1,
-                    productId);
+    public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
+        // Carpetas: productos/{productId}
+        String root = drive.getOrCreateFolder("productos", null);
+        String folder = drive.getOrCreateFolder(String.valueOf(productId), root);
 
-            String driveId = drive.uploadFile(file, true);
-            log.info("storeProductFile -> subido a Drive OK. driveId={}", driveId);
-
-            StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
-            log.info("storeProductFile -> guardado DB OK. storedFile.id={}, driveId={}", sf.getId(), sf.getDriveFileId());
-            return toDto(sf);
-        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
-            log.error("Google Drive error: code={}, status={}, details={}",
-                    e.getStatusCode(), e.getStatusMessage(),
-                    e.getDetails() != null ? e.getDetails().toPrettyString() : "(sin details)", e);
-            throw e;
-        } catch (Exception e) {
-            log.error("Fallo en storeProductFile: {}", e.getMessage(), e);
-            throw e;
-        }
+        String driveId = drive.uploadFileToFolder(file, folder); // o uploadFileToFolderWithTemp(...)
+        StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
+        return toDto(sf);
     }
 
     public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
-        try {
-            log.info("storeReceiptFile: originalName={}, contentType={}, size={}, orderId={}",
-                    file != null ? file.getOriginalFilename() : "null",
-                    file != null ? file.getContentType() : "null",
-                    file != null ? file.getSize() : -1,
-                    orderId);
+        // Carpetas: comprobantes/{orderId}
+        String root = drive.getOrCreateFolder("comprobantes", null);
+        String folder = drive.getOrCreateFolder(String.valueOf(orderId), root);
 
-            String driveId = drive.uploadFile(file, false);
-            log.info("storeReceiptFile -> subido a Drive OK. driveId={}", driveId);
-
-            StoredFile sf = saveStoredFile(file, uploader, null, orderId, driveId);
-            log.info("storeReceiptFile -> guardado DB OK. storedFile.id={}, driveId={}", sf.getId(), sf.getDriveFileId());
-            return toDto(sf);
-        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
-            log.error("Google Drive error: code={}, status={}, details={}",
-                    e.getStatusCode(), e.getStatusMessage(),
-                    e.getDetails() != null ? e.getDetails().toPrettyString() : "(sin details)", e);
-            throw e;
-        } catch (Exception e) {
-            log.error("Fallo en storeReceiptFile: {}", e.getMessage(), e);
-            throw e;
-        }
+        String driveId = drive.uploadFileToFolder(file, folder); // o uploadFileToFolderWithTemp(...)
+        StoredFile sf = saveStoredFile(file, uploader, null, orderId, driveId);
+        return toDto(sf);
     }
 
-
     private StoredFile saveStoredFile(MultipartFile file, String uploader,
-                                      Long productId, Long orderId, String driveId) throws IOException {
+            Long productId, Long orderId, String driveId) throws IOException {
 
         StoredFile sf = new StoredFile();
         sf.setDriveFileId(driveId);
-        sf.setFilename(file.getOriginalFilename());   // “lógico”
+        sf.setFilename(file.getOriginalFilename()); // “lógico”
         sf.setOriginalName(file.getOriginalFilename());
         sf.setFileType(file.getContentType());
         sf.setSize(file.getSize());

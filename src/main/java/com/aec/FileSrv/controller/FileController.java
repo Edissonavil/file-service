@@ -78,6 +78,14 @@ public class FileController {
                 .body(new InputStreamResource(in));
     }
 
+    @GetMapping("/{productId}/{driveId}")
+public ResponseEntity<InputStreamResource> serveFileByProduct(
+        @PathVariable Long productId,
+        @PathVariable String driveId) throws IOException {
+    return serveFile(driveId);
+}
+
+
     @GetMapping(path = "/list/{type}")
     public List<FileInfoDto> listFiles(
             @PathVariable String type,

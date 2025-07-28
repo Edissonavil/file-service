@@ -2,10 +2,20 @@ package com.aec.FileSrv.service;
 
 import com.aec.FileSrv.config.DriveProperties;
 import com.aec.FileSrv.controller.FileController;
+import com.google.api.client.http.FileContent;
 import com.google.api.client.http.InputStreamContent;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.FileList;
+
+import io.micrometer.common.lang.Nullable;
 import lombok.RequiredArgsConstructor;
+import com.google.api.client.http.FileContent;
+import com.google.api.client.http.InputStreamContent;
+import com.google.api.services.drive.Drive;
+import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.FileList;
+
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +33,6 @@ public class GoogleDriveService {
     private final Drive drive;
     private final DriveProperties props;
     private final Logger log = LoggerFactory.getLogger(FileController.class);
-
 
 public String uploadFile(MultipartFile file, boolean isProduct) throws IOException {
         String parentId = isProduct ? props.getFolderProductId() : props.getFolderReceiptId();
@@ -75,6 +84,59 @@ public String uploadFile(MultipartFile file, boolean isProduct) throws IOExcepti
     public void deleteFile(String fileId) throws IOException {
     drive.files().delete(fileId).execute();
 }
+
+public String getOrCreateFolder(String name, String parentId) throws IOException {
+    StringBuilder q = new StringBuilder();
+    q.append("mimeType = 'application/vnd.google-apps.folder' ");
+    q.append("and name = '").append(name.replace("'", "\\'")).append("' ");
+    q.append("and trashed = false");
+    if (parentId != null) {
+        q.append(" and '").append(parentId).append("' in parents");
+    }
+
+    FileList result = drive.files().list()
+            .setQ(q.toString())
+            .setFields("files(id,name)")
+            .setPageSize(1)
+            .execute();
+
+    if (result.getFiles() != null && !result.getFiles().isEmpty()) {
+        return result.getFiles().get(0).getId();
+    }
+
+    File folder = new File();
+    folder.setName(name);
+    folder.setMimeType("application/vnd.google-apps.folder");
+    if (parentId != null) {
+        folder.setParents(java.util.List.of(parentId));
+    }
+
+    File created = drive.files().create(folder)
+            .setFields("id")
+            .execute();
+
+    return created.getId();
+}
+
+
+public String uploadFileToFolder(MultipartFile mf, String folderId) throws IOException {
+    File meta = new File();
+    meta.setName(mf.getOriginalFilename());
+    meta.setParents(java.util.List.of(folderId));
+
+    InputStreamContent mediaContent =
+            new InputStreamContent(mf.getContentType(), mf.getInputStream());
+    mediaContent.setLength(mf.getSize());
+
+    File uploaded = drive.files()
+            .create(meta, mediaContent)
+            .setFields("id")
+            .execute();
+
+    return uploaded.getId();
+}
+
+
 
 
 }
