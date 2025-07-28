@@ -13,8 +13,8 @@ public class StoredFile {
     private Long id;
 
     // Nuevo campo para almacenar el ID del archivo en Google Drive
-    @Column(name = "google_drive_file_id", nullable = false, unique = true)
-    private String googleDriveFileId;
+    @Column(name = "drive_file_id", nullable = false, unique = true)
+    private String DriveFileId;
 
     @Column(nullable = false)
     private String filename; 

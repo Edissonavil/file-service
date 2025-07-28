@@ -1,18 +1,17 @@
 package com.aec.FileSrv.service;
 
-import com.aec.FileSrv.model.StoredFile;
 import com.aec.FileSrv.Repository.StoredFileRepository;
+import com.aec.FileSrv.dto.FileInfoDto;
+import com.aec.FileSrv.model.StoredFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.NoSuchFileException;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -22,66 +21,74 @@ import java.util.Optional;
 public class FileStorageService {
 
     private final StoredFileRepository repo;
-    private final GoogleDriveService googleDriveService;
-
-    public record UploadFileResponse(String driveFileId, String originalFilename) {}
+    private final GoogleDriveService drive;
 
     public Resource loadAsResource(String driveFileId) throws IOException {
-        log.info("🔍 Solicitando archivo de Google Drive: ID={}", driveFileId);
-        Optional<StoredFile> storedFileOpt = repo.findByDriveFileId(driveFileId);
-        if (storedFileOpt.isEmpty()) {
-            throw new NoSuchFileException("Archivo no encontrado en la base de datos: " + driveFileId);
+        Optional<StoredFile> sf = repo.findByDriveFileId(driveFileId);
+        if (sf.isEmpty()) {
+            throw new java.nio.file.NoSuchFileException("No existe en DB: " + driveFileId);
         }
-        InputStream inputStream = googleDriveService.downloadFile(driveFileId);
-        return new InputStreamResource(inputStream);
+        InputStream in = drive.downloadFile(driveFileId);
+        return new InputStreamResource(in);
     }
 
     public String getFileContentType(String driveFileId) {
         return repo.findByDriveFileId(driveFileId)
                 .map(StoredFile::getFileType)
-                .orElse(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+                .orElse("application/octet-stream");
     }
 
-    public UploadFileResponse storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
-        String driveId = googleDriveService.uploadFile(file, true);
+    public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
+        String driveId = drive.uploadFile(file, true);
+        StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
+
+        return toDto(sf);
+    }
+
+    public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
+        String driveId = drive.uploadFile(file, false);
+        StoredFile sf = saveStoredFile(file, uploader, null, orderId, driveId);
+
+        return toDto(sf);
+    }
+
+    private StoredFile saveStoredFile(MultipartFile file, String uploader,
+                                      Long productId, Long orderId, String driveId) throws IOException {
+
         StoredFile sf = new StoredFile();
-        sf.setFilename(file.getOriginalFilename());
+        sf.setDriveFileId(driveId);
+        sf.setFilename(file.getOriginalFilename());   // “lógico”
         sf.setOriginalName(file.getOriginalFilename());
         sf.setFileType(file.getContentType());
         sf.setSize(file.getSize());
-        sf.setUploader(uploader);
+        sf.setUploader(uploader != null ? uploader : "public");
+        sf.setUploadedAt(Instant.now());
         sf.setProductId(productId);
-        sf.setUploadedAt(Instant.now());
-        sf.setDriveFileId(driveId);
-        sf = repo.save(sf);
-        log.info("Archivo de producto guardado. Drive ID: {}", driveId);
-        return new UploadFileResponse(driveId, file.getOriginalFilename());
-    }
-
-    public UploadFileResponse storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
-        String driveId = googleDriveService.uploadFile(file, false);
-        StoredFile sf = new StoredFile();
-        sf.setFilename(file.getOriginalFilename());
-        sf.setOriginalName(file.getOriginalFilename());
-        sf.setFileType(file.getContentType());
-        sf.setSize(file.getSize());
-        sf.setUploader(uploader);
         sf.setOrderId(orderId);
-        sf.setUploadedAt(Instant.now());
-        sf.setDriveFileId(driveId);
-        sf = repo.save(sf);
-        log.info("Archivo de comprobante guardado. Drive ID: {}", driveId);
-        return new UploadFileResponse(driveId, file.getOriginalFilename());
+
+        return repo.save(sf);
     }
 
     public void deleteFile(String driveFileId) throws IOException {
-        Optional<StoredFile> storedFileOpt = repo.findByDriveFileId(driveFileId);
-        if (storedFileOpt.isEmpty()) {
-            log.warn("Intento de eliminar archivo no encontrado en DB: {}", driveFileId);
-            return;
-        }
-        googleDriveService.deleteFile(driveFileId);
-        repo.delete(storedFileOpt.get());
-        log.info("Archivo {} eliminado de Google Drive y DB.", driveFileId);
+        repo.findByDriveFileId(driveFileId).ifPresent(sf -> {
+            try {
+                drive.deleteFile(driveFileId);
+            } catch (IOException e) {
+                log.warn("No se pudo borrar en Drive {}: {}", driveFileId, e.getMessage());
+            }
+            repo.delete(sf);
+        });
+    }
+
+    public FileInfoDto toDto(StoredFile sf) {
+        return FileInfoDto.builder()
+                .id(sf.getId())
+                .driveFileId(sf.getDriveFileId())
+                .filename(sf.getFilename())
+                .originalName(sf.getOriginalName())
+                .fileType(sf.getFileType())
+                .size(sf.getSize())
+                .uploader(sf.getUploader())
+                .build();
     }
 }
