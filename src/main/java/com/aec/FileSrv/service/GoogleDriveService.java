@@ -1,10 +1,14 @@
 package com.aec.FileSrv.service;
 
 import com.aec.FileSrv.config.DriveProperties;
+import com.aec.FileSrv.controller.FileController;
 import com.google.api.client.http.InputStreamContent;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import lombok.RequiredArgsConstructor;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,19 +22,39 @@ import java.util.List;
 public class GoogleDriveService {
     private final Drive drive;
     private final DriveProperties props;
+    private final Logger log = LoggerFactory.getLogger(FileController.class);
 
-    public String uploadFile(MultipartFile file, boolean isProduct) throws IOException {
+
+public String uploadFile(MultipartFile file, boolean isProduct) throws IOException {
+        String parentId = isProduct ? props.getFolderProductId() : props.getFolderReceiptId();
+        String name = file.getOriginalFilename();
+        String ctype = file.getContentType();
+
+        log.info("Drive.uploadFile: isProduct={}, parentId={}, name={}, contentType={}, size={}",
+                isProduct, parentId, name, ctype, file.getSize());
+
         File metadata = new File();
-        metadata.setName(file.getOriginalFilename());
-        metadata.setParents(Collections.singletonList(isProduct ? props.getFolderProductId() : props.getFolderReceiptId()));
+        metadata.setName(name);
+        metadata.setParents(Collections.singletonList(parentId));
 
         try (InputStream in = file.getInputStream()) {
-            InputStreamContent media = new InputStreamContent(file.getContentType(), in);
+            InputStreamContent media = new InputStreamContent(
+                    ctype != null ? ctype : "application/octet-stream", in);
+
             File created = drive.files()
-                .create(metadata, media)
-                .setFields("id, name, webViewLink, webContentLink")
-                .execute();
+                    .create(metadata, media)
+                    .setFields("id,name,mimeType,size,webViewLink,webContentLink,parents")
+                    .execute();
+
+            log.info("Drive.create OK -> id={}, name={}, mimeType={}, size={}, parents={}",
+                    created.getId(), created.getName(), created.getMimeType(),
+                    created.getSize(), created.getParents());
             return created.getId();
+        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
+            log.error("Drive.create ERROR code={}, status={}, details={}",
+                    e.getStatusCode(), e.getStatusMessage(),
+                    e.getDetails() != null ? e.getDetails().toPrettyString() : "(sin details)", e);
+            throw e;
         }
     }
 

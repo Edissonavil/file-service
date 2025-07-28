@@ -38,21 +38,56 @@ public class FileStorageService {
                 .orElse("application/octet-stream");
     }
 
-    public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
-    String driveId = drive.uploadFile(file, true);
-    log.info("storeProductFile -> subido a Drive. driveId={}", driveId);
-    StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
-    log.info("storeProductFile -> guardado DB. storedFile.id={}, driveId={}", sf.getId(), sf.getDriveFileId());
-    return toDto(sf);
-}
+  public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
+        try {
+            log.info("storeProductFile: originalName={}, contentType={}, size={}, productId={}",
+                    file != null ? file.getOriginalFilename() : "null",
+                    file != null ? file.getContentType() : "null",
+                    file != null ? file.getSize() : -1,
+                    productId);
 
+            String driveId = drive.uploadFile(file, true);
+            log.info("storeProductFile -> subido a Drive OK. driveId={}", driveId);
+
+            StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
+            log.info("storeProductFile -> guardado DB OK. storedFile.id={}, driveId={}", sf.getId(), sf.getDriveFileId());
+            return toDto(sf);
+        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
+            log.error("Google Drive error: code={}, status={}, details={}",
+                    e.getStatusCode(), e.getStatusMessage(),
+                    e.getDetails() != null ? e.getDetails().toPrettyString() : "(sin details)", e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Fallo en storeProductFile: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
 
     public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
-        String driveId = drive.uploadFile(file, false);
-        StoredFile sf = saveStoredFile(file, uploader, null, orderId, driveId);
+        try {
+            log.info("storeReceiptFile: originalName={}, contentType={}, size={}, orderId={}",
+                    file != null ? file.getOriginalFilename() : "null",
+                    file != null ? file.getContentType() : "null",
+                    file != null ? file.getSize() : -1,
+                    orderId);
 
-        return toDto(sf);
+            String driveId = drive.uploadFile(file, false);
+            log.info("storeReceiptFile -> subido a Drive OK. driveId={}", driveId);
+
+            StoredFile sf = saveStoredFile(file, uploader, null, orderId, driveId);
+            log.info("storeReceiptFile -> guardado DB OK. storedFile.id={}, driveId={}", sf.getId(), sf.getDriveFileId());
+            return toDto(sf);
+        } catch (com.google.api.client.googleapis.json.GoogleJsonResponseException e) {
+            log.error("Google Drive error: code={}, status={}, details={}",
+                    e.getStatusCode(), e.getStatusMessage(),
+                    e.getDetails() != null ? e.getDetails().toPrettyString() : "(sin details)", e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Fallo en storeReceiptFile: {}", e.getMessage(), e);
+            throw e;
+        }
     }
+
 
     private StoredFile saveStoredFile(MultipartFile file, String uploader,
                                       Long productId, Long orderId, String driveId) throws IOException {
