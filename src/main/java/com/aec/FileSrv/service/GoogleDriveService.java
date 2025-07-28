@@ -121,21 +121,27 @@ public String getOrCreateFolder(String name, String parentId) throws IOException
 }
 
 
-public String uploadFileToFolder(MultipartFile mf, String folderId) throws IOException {
-    File meta = new File();
-    meta.setName(mf.getOriginalFilename());
-    meta.setParents(java.util.List.of(folderId));
+public String uploadFileToFolder(MultipartFile multipart, String folderPath) throws IOException {
+    String folderId = getOrCreateFolder(folderPath);
 
-    InputStreamContent mediaContent =
-            new InputStreamContent(mf.getContentType(), mf.getInputStream());
-    mediaContent.setLength(mf.getSize());
+    String filename = multipart.getOriginalFilename() != null ? multipart.getOriginalFilename() : "file";
+    String mime = multipart.getContentType() != null ? multipart.getContentType() : "application/octet-stream";
 
-    File uploaded = drive.files()
-            .create(meta, mediaContent)
-            .setFields("id")
-            .execute();
+    File metadata = new File()
+            .setName(filename)
+            .setParents(List.of(folderId));
 
-    return uploaded.getId();
+    try (InputStream in = multipart.getInputStream()) {
+        InputStreamContent mediaContent = new InputStreamContent(mime, in);
+        mediaContent.setLength(multipart.getSize());
+
+        File uploaded = drive.files()
+                .create(metadata, mediaContent)
+                .setFields("id")
+                .execute();
+
+        return uploaded.getId();
+    }
 }
 
  public String getOrCreateFolder(String path) throws IOException {
