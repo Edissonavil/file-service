@@ -40,6 +40,4 @@ public class StoredFile {
     @Column(name = "order_id", nullable = true)
     private Long orderId;
 
-    @Column(nullable = false, unique = true)
-    private String driveFileId;
 }
