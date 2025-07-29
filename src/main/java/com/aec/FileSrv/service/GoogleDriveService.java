@@ -17,7 +17,6 @@ import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
 import com.google.api.services.drive.model.FileList;
 
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -36,7 +35,7 @@ public class GoogleDriveService {
     private final DriveProperties props;
     private final Logger log = LoggerFactory.getLogger(FileController.class);
 
-public String uploadFile(MultipartFile file, boolean isProduct) throws IOException {
+    public String uploadFile(MultipartFile file, boolean isProduct) throws IOException {
         String parentId = isProduct ? props.getFolderProductId() : props.getFolderReceiptId();
         String name = file.getOriginalFilename();
         String ctype = file.getContentType();
@@ -74,77 +73,106 @@ public String uploadFile(MultipartFile file, boolean isProduct) throws IOExcepti
     }
 
     public List<File> listFiles(boolean isProduct, int pageSize) throws IOException {
-        String q = "'" + (isProduct ? props.getFolderProductId() : props.getFolderReceiptId()) + "' in parents and trashed=false";
+        String q = "'" + (isProduct ? props.getFolderProductId() : props.getFolderReceiptId())
+                + "' in parents and trashed=false";
         return drive.files().list()
-            .setQ(q)
-            .setPageSize(pageSize)
-            .setFields("files(id, name, mimeType, size, webViewLink)")
-            .execute()
-            .getFiles();
+                .setQ(q)
+                .setPageSize(pageSize)
+                .setFields("files(id, name, mimeType, size, webViewLink)")
+                .execute()
+                .getFiles();
     }
-    
+
     public void deleteFile(String fileId) throws IOException {
-    drive.files().delete(fileId).execute();
-}
-
-public String getOrCreateFolder(String name, String parentId) throws IOException {
-    StringBuilder q = new StringBuilder();
-    q.append("mimeType = 'application/vnd.google-apps.folder' ");
-    q.append("and name = '").append(name.replace("'", "\\'")).append("' ");
-    q.append("and trashed = false");
-    if (parentId != null) {
-        q.append(" and '").append(parentId).append("' in parents");
+        drive.files().delete(fileId).execute();
     }
 
-    FileList result = drive.files().list()
-            .setQ(q.toString())
-            .setFields("files(id,name)")
-            .setPageSize(1)
-            .execute();
+    public String getOrCreateFolder(String name, String parentId) throws IOException {
+        StringBuilder q = new StringBuilder();
+        q.append("mimeType = 'application/vnd.google-apps.folder' ");
+        q.append("and name = '").append(name.replace("'", "\\'")).append("' ");
+        q.append("and trashed = false");
+        if (parentId != null) {
+            q.append(" and '").append(parentId).append("' in parents");
+        }
 
-    if (result.getFiles() != null && !result.getFiles().isEmpty()) {
-        return result.getFiles().get(0).getId();
-    }
+        FileList result = drive.files().list()
+                .setQ(q.toString())
+                .setFields("files(id,name)")
+                .setPageSize(1)
+                .execute();
 
-    File folder = new File();
-    folder.setName(name);
-    folder.setMimeType("application/vnd.google-apps.folder");
-    if (parentId != null) {
-        folder.setParents(java.util.List.of(parentId));
-    }
+        if (result.getFiles() != null && !result.getFiles().isEmpty()) {
+            return result.getFiles().get(0).getId();
+        }
 
-    File created = drive.files().create(folder)
-            .setFields("id")
-            .execute();
+        File folder = new File();
+        folder.setName(name);
+        folder.setMimeType("application/vnd.google-apps.folder");
+        if (parentId != null) {
+            folder.setParents(java.util.List.of(parentId));
+        }
 
-    return created.getId();
-}
-
-
-public String uploadFileToFolder(MultipartFile multipart, String folderPath) throws IOException {
-    String folderId = getOrCreateFolder(folderPath);
-
-    String filename = multipart.getOriginalFilename() != null ? multipart.getOriginalFilename() : "file";
-    String mime = multipart.getContentType() != null ? multipart.getContentType() : "application/octet-stream";
-
-    File metadata = new File()
-            .setName(filename)
-            .setParents(List.of(folderId));
-
-    try (InputStream in = multipart.getInputStream()) {
-        InputStreamContent mediaContent = new InputStreamContent(mime, in);
-        mediaContent.setLength(multipart.getSize());
-
-        File uploaded = drive.files()
-                .create(metadata, mediaContent)
+        File created = drive.files().create(folder)
                 .setFields("id")
                 .execute();
 
-        return uploaded.getId();
+        return created.getId();
     }
-}
 
- public String getOrCreateFolder(String path) throws IOException {
+    public String uploadFileToFolder(MultipartFile multipart, String folderPath) throws IOException {
+        String folderId = getOrCreateFolder(folderPath);
+
+        String filename = multipart.getOriginalFilename() != null ? multipart.getOriginalFilename() : "file";
+        String mime = multipart.getContentType() != null ? multipart.getContentType() : "application/octet-stream";
+
+        // 1. Buscar si el archivo ya existe en la carpeta de Drive
+        String existingFileId = findFileInFolder(folderId, filename);
+
+        File metadata = new File()
+                .setName(filename)
+                .setParents(List.of(folderId));
+
+        try (InputStream in = multipart.getInputStream()) {
+            InputStreamContent mediaContent = new InputStreamContent(mime, in);
+            mediaContent.setLength(multipart.getSize());
+
+            File uploaded;
+            if (existingFileId != null) {
+                // 2. Si existe, actualizar el archivo existente
+                uploaded = drive.files()
+                        .update(existingFileId, metadata, mediaContent)
+                        .setFields("id")
+                        .execute();
+                log.info("Drive.update OK -> id={}, name={}", uploaded.getId(), uploaded.getName());
+            } else {
+                // 3. Si no existe, crear un nuevo archivo
+                uploaded = drive.files()
+                        .create(metadata, mediaContent)
+                        .setFields("id")
+                        .execute();
+                log.info("Drive.create OK -> id={}, name={}", uploaded.getId(), uploaded.getName());
+            }
+
+            return uploaded.getId();
+        }
+    }
+
+    // Nuevo método para buscar un archivo por nombre en una carpeta específica
+    private String findFileInFolder(String folderId, String filename) throws IOException {
+        String q = "'" + folderId + "' in parents and name='" + filename.replace("'", "\\'") + "' and trashed=false";
+        FileList result = drive.files().list()
+                .setQ(q)
+                .setFields("files(id)")
+                .setPageSize(1)
+                .execute();
+        if (result.getFiles() != null && !result.getFiles().isEmpty()) {
+            return result.getFiles().get(0).getId();
+        }
+        return null;
+    }
+
+    public String getOrCreateFolder(String path) throws IOException {
         String[] parts = path.split("/");
         String parentId = "root";
 
@@ -165,7 +193,8 @@ public String uploadFileToFolder(MultipartFile multipart, String folderPath) thr
                 .setQ(q)
                 .setFields("files(id, name)")
                 .execute();
-        if (result.getFiles() == null || result.getFiles().isEmpty()) return null;
+        if (result.getFiles() == null || result.getFiles().isEmpty())
+            return null;
         return result.getFiles().get(0).getId();
     }
 
@@ -200,8 +229,7 @@ public String uploadFileToFolder(MultipartFile multipart, String folderPath) thr
                             f.getId(),
                             f.getName(),
                             f.getMimeType(),
-                            f.getSize()
-                    ));
+                            f.getSize()));
                 }
             }
             pageToken = result.getNextPageToken();
@@ -210,31 +238,32 @@ public String uploadFileToFolder(MultipartFile multipart, String folderPath) thr
         return out;
     }
 
-    /** Sube directamente al folder cuyo ID ya tienes, sin volver a crear carpetas */
-public String uploadFileToFolderById(MultipartFile multipart, String folderId) throws IOException {
-    String filename = multipart.getOriginalFilename() != null
-            ? multipart.getOriginalFilename()
-            : "file";
-    String mime = multipart.getContentType() != null
-            ? multipart.getContentType()
-            : "application/octet-stream";
+    /**
+     * Sube directamente al folder cuyo ID ya tienes, sin volver a crear carpetas
+     */
+    public String uploadFileToFolderById(MultipartFile multipart, String folderId) throws IOException {
+        String filename = multipart.getOriginalFilename() != null
+                ? multipart.getOriginalFilename()
+                : "file";
+        String mime = multipart.getContentType() != null
+                ? multipart.getContentType()
+                : "application/octet-stream";
 
-    File metadata = new File()
-            .setName(filename)
-            .setParents(List.of(folderId));    // aquí usamos folderId directamente
+        File metadata = new File()
+                .setName(filename)
+                .setParents(List.of(folderId)); // aquí usamos folderId directamente
 
-    try (InputStream in = multipart.getInputStream()) {
-        InputStreamContent mediaContent = new InputStreamContent(mime, in);
-        mediaContent.setLength(multipart.getSize());
+        try (InputStream in = multipart.getInputStream()) {
+            InputStreamContent mediaContent = new InputStreamContent(mime, in);
+            mediaContent.setLength(multipart.getSize());
 
-        File uploaded = drive.files()
-                .create(metadata, mediaContent)
-                .setFields("id")
-                .execute();
+            File uploaded = drive.files()
+                    .create(metadata, mediaContent)
+                    .setFields("id")
+                    .execute();
 
-        return uploaded.getId();
+            return uploaded.getId();
+        }
     }
-}
-
 
 }

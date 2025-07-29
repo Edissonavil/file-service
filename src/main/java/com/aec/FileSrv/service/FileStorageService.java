@@ -43,30 +43,72 @@ public class FileStorageService {
                 .orElse("application/octet-stream");
     }
 
-    public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
-        // Carpetas: productos/{productId}
-        String root   = drive.getOrCreateFolder("productos", null);
-        String folder = drive.getOrCreateFolder(String.valueOf(productId), root);
+public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
+    String root = drive.getOrCreateFolder("productos", null);
+    String folder = drive.getOrCreateFolder(String.valueOf(productId), root);
 
-        // Subimos DIRECTAMENTE al folder cuyo ID ya tenemos:
-        String driveId = drive.uploadFileToFolderById(file, folder);
+    String driveId = drive.uploadFileToFolder(file, folder);
 
-        StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
-        return toDto(sf);
+    Optional<StoredFile> existingStoredFile = repo.findByProductIdAndFilename(productId, file.getOriginalFilename());
+
+    StoredFile sf;
+    if (existingStoredFile.isPresent()) {
+        sf = existingStoredFile.get();
+        // Actualizar solo los campos que podrían cambiar
+        sf.setDriveFileId(driveId); // Aunque driveId debería ser el mismo si se actualizó
+        sf.setFileType(file.getContentType());
+        sf.setSize(file.getSize());
+        sf.setUploader(uploader != null ? uploader : "public");
+        sf.setUploadedAt(Instant.now());
+        // No cambiamos productId ni orderId aquí
+    } else {
+        // Si no existe, crear un nuevo StoredFile
+        sf = new StoredFile();
+        sf.setDriveFileId(driveId);
+        sf.setFilename(file.getOriginalFilename());
+        sf.setOriginalName(file.getOriginalFilename());
+        sf.setFileType(file.getContentType());
+        sf.setSize(file.getSize());
+        sf.setUploader(uploader != null ? uploader : "public");
+        sf.setUploadedAt(Instant.now());
+        sf.setProductId(productId);
+        sf.setOrderId(null); 
     }
 
-    public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
-        // Carpetas: comprobantes/{orderId}
-        String root   = drive.getOrCreateFolder("comprobantes", null);
-        String folder = drive.getOrCreateFolder(String.valueOf(orderId), root);
+    return toDto(repo.save(sf));
+}
 
-        // Subimos DIRECTAMENTE al folder cuyo ID ya tenemos:
-        String driveId = drive.uploadFileToFolderById(file, folder);
+// Harías una modificación similar para storeReceiptFile:
+public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
+    String root = drive.getOrCreateFolder("comprobantes", null);
+    String folder = drive.getOrCreateFolder(String.valueOf(orderId), root);
 
-        StoredFile sf = saveStoredFile(file, uploader, null, orderId, driveId);
-        return toDto(sf);
+    String driveId = drive.uploadFileToFolder(file, folder);
+
+    Optional<StoredFile> existingStoredFile = repo.findByOrderIdAndFilename(orderId, file.getOriginalFilename());
+
+    StoredFile sf;
+    if (existingStoredFile.isPresent()) {
+        sf = existingStoredFile.get();
+        sf.setDriveFileId(driveId);
+        sf.setFileType(file.getContentType());
+        sf.setSize(file.getSize());
+        sf.setUploader(uploader != null ? uploader : "public");
+        sf.setUploadedAt(Instant.now());
+    } else {
+        sf = new StoredFile();
+        sf.setDriveFileId(driveId);
+        sf.setFilename(file.getOriginalFilename());
+        sf.setOriginalName(file.getOriginalFilename());
+        sf.setFileType(file.getContentType());
+        sf.setSize(file.getSize());
+        sf.setUploader(uploader != null ? uploader : "public");
+        sf.setUploadedAt(Instant.now());
+        sf.setProductId(null); // Asegúrate de establecerlo correctamente para recibos
+        sf.setOrderId(orderId);
     }
-
+    return toDto(repo.save(sf));
+}
     public void streamProductZipFromDrive(Long productId, OutputStream os) throws IOException {
         String folderName = "productos/" + productId;
         String folderId   = drive.getOrCreateFolder(folderName);
