@@ -43,94 +43,136 @@ public class FileStorageService {
                 .orElse("application/octet-stream");
     }
 
-public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
-    String root = drive.getOrCreateFolder("productos", null);
-    String folder = drive.getOrCreateFolder(String.valueOf(productId), root);
+    public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
+        try {
+            // Validaciones
+            if (file == null || file.isEmpty()) {
+                throw new IllegalArgumentException("El archivo no puede estar vacío");
+            }
+            if (productId == null) {
+                throw new IllegalArgumentException("El productId no puede ser null");
+            }
 
-    String driveId = drive.uploadFileToFolder(file, folder);
+            // Crear estructura de carpetas
+            String root = drive.getOrCreateFolder("productos", null);
+            String folder = drive.getOrCreateFolder(String.valueOf(productId), root);
 
-    Optional<StoredFile> existingStoredFile = repo.findByProductIdAndFilename(productId, file.getOriginalFilename());
+            // Subir archivo
+            String driveId = drive.uploadFileToFolder(file, folder);
 
-    StoredFile sf;
-    if (existingStoredFile.isPresent()) {
-        sf = existingStoredFile.get();
-        // Actualizar solo los campos que podrían cambiar
-        sf.setDriveFileId(driveId); // Aunque driveId debería ser el mismo si se actualizó
-        sf.setFileType(file.getContentType());
-        sf.setSize(file.getSize());
-        sf.setUploader(uploader != null ? uploader : "public");
-        sf.setUploadedAt(Instant.now());
-        // No cambiamos productId ni orderId aquí
-    } else {
-        // Si no existe, crear un nuevo StoredFile
-        sf = new StoredFile();
-        sf.setDriveFileId(driveId);
-        sf.setFilename(file.getOriginalFilename());
-        sf.setOriginalName(file.getOriginalFilename());
-        sf.setFileType(file.getContentType());
-        sf.setSize(file.getSize());
-        sf.setUploader(uploader != null ? uploader : "public");
-        sf.setUploadedAt(Instant.now());
-        sf.setProductId(productId);
-        sf.setOrderId(null); 
+            // Buscar si ya existe
+            Optional<StoredFile> existingStoredFile = repo.findByProductIdAndFilename(productId, file.getOriginalFilename());
+
+            StoredFile sf;
+            if (existingStoredFile.isPresent()) {
+                sf = existingStoredFile.get();
+                // Actualizar solo los campos que podrían cambiar
+                sf.setDriveFileId(driveId);
+                sf.setFileType(file.getContentType());
+                sf.setSize(file.getSize());
+                sf.setUploader(uploader != null ? uploader : "public");
+                sf.setUploadedAt(Instant.now());
+                log.info("Actualizando archivo existente para producto {}: {}", productId, file.getOriginalFilename());
+            } else {
+                // Si no existe, crear un nuevo StoredFile
+                sf = new StoredFile();
+                sf.setDriveFileId(driveId);
+                sf.setFilename(file.getOriginalFilename());
+                sf.setOriginalName(file.getOriginalFilename());
+                sf.setFileType(file.getContentType());
+                sf.setSize(file.getSize());
+                sf.setUploader(uploader != null ? uploader : "public");
+                sf.setUploadedAt(Instant.now());
+                sf.setProductId(productId);
+                sf.setOrderId(null);
+                log.info("Creando nuevo archivo para producto {}: {}", productId, file.getOriginalFilename());
+            }
+
+            return toDto(repo.save(sf));
+        } catch (Exception e) {
+            log.error("Error almacenando archivo de producto {}: {}", productId, e.getMessage(), e);
+            throw new IOException("Error almacenando archivo de producto: " + e.getMessage(), e);
+        }
     }
 
-    return toDto(repo.save(sf));
-}
+    public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
+        try {
+            // Validaciones
+            if (file == null || file.isEmpty()) {
+                throw new IllegalArgumentException("El archivo no puede estar vacío");
+            }
+            if (orderId == null) {
+                throw new IllegalArgumentException("El orderId no puede ser null");
+            }
 
-// Harías una modificación similar para storeReceiptFile:
-public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
-    String root = drive.getOrCreateFolder("comprobantes", null);
-    String folder = drive.getOrCreateFolder(String.valueOf(orderId), root);
+            // Crear estructura de carpetas
+            String root = drive.getOrCreateFolder("comprobantes", null);
+            String folder = drive.getOrCreateFolder(String.valueOf(orderId), root);
 
-    String driveId = drive.uploadFileToFolder(file, folder);
+            // Subir archivo
+            String driveId = drive.uploadFileToFolder(file, folder);
 
-    Optional<StoredFile> existingStoredFile = repo.findByOrderIdAndFilename(orderId, file.getOriginalFilename());
+            // Buscar si ya existe
+            Optional<StoredFile> existingStoredFile = repo.findByOrderIdAndFilename(orderId, file.getOriginalFilename());
 
-    StoredFile sf;
-    if (existingStoredFile.isPresent()) {
-        sf = existingStoredFile.get();
-        sf.setDriveFileId(driveId);
-        sf.setFileType(file.getContentType());
-        sf.setSize(file.getSize());
-        sf.setUploader(uploader != null ? uploader : "public");
-        sf.setUploadedAt(Instant.now());
-    } else {
-        sf = new StoredFile();
-        sf.setDriveFileId(driveId);
-        sf.setFilename(file.getOriginalFilename());
-        sf.setOriginalName(file.getOriginalFilename());
-        sf.setFileType(file.getContentType());
-        sf.setSize(file.getSize());
-        sf.setUploader(uploader != null ? uploader : "public");
-        sf.setUploadedAt(Instant.now());
-        sf.setProductId(null); // Asegúrate de establecerlo correctamente para recibos
-        sf.setOrderId(orderId);
+            StoredFile sf;
+            if (existingStoredFile.isPresent()) {
+                sf = existingStoredFile.get();
+                sf.setDriveFileId(driveId);
+                sf.setFileType(file.getContentType());
+                sf.setSize(file.getSize());
+                sf.setUploader(uploader != null ? uploader : "public");
+                sf.setUploadedAt(Instant.now());
+                log.info("Actualizando comprobante existente para orden {}: {}", orderId, file.getOriginalFilename());
+            } else {
+                sf = new StoredFile();
+                sf.setDriveFileId(driveId);
+                sf.setFilename(file.getOriginalFilename());
+                sf.setOriginalName(file.getOriginalFilename());
+                sf.setFileType(file.getContentType());
+                sf.setSize(file.getSize());
+                sf.setUploader(uploader != null ? uploader : "public");
+                sf.setUploadedAt(Instant.now());
+                sf.setProductId(null);
+                sf.setOrderId(orderId);
+                log.info("Creando nuevo comprobante para orden {}: {}", orderId, file.getOriginalFilename());
+            }
+
+            return toDto(repo.save(sf));
+        } catch (Exception e) {
+            log.error("Error almacenando comprobante para orden {}: {}", orderId, e.getMessage(), e);
+            throw new IOException("Error almacenando comprobante: " + e.getMessage(), e);
+        }
     }
-    return toDto(repo.save(sf));
-}
+
     public void streamProductZipFromDrive(Long productId, OutputStream os) throws IOException {
-        String folderName = "productos/" + productId;
-        String folderId   = drive.getOrCreateFolder(folderName);
+        try {
+            // Usar el método correcto para rutas con "/"
+            String folderPath = "productos/" + productId;
+            String folderId = drive.getOrCreateFolderByPath(folderPath);
 
-        var files = drive.listFilesInFolder(folderId);
+            var files = drive.listFilesInFolder(folderId);
 
-        try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(os))) {
-            boolean added = false;
+            try (ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(os))) {
+                boolean added = false;
 
-            for (DriveFile f : files) {
-                added = true;
-                zos.putNextEntry(new java.util.zip.ZipEntry(f.getName()));
-                try (InputStream in = drive.downloadFile(f.getId())) {
-                    in.transferTo(zos);
+                for (DriveFile f : files) {
+                    added = true;
+                    zos.putNextEntry(new java.util.zip.ZipEntry(f.getName()));
+                    try (InputStream in = drive.downloadFile(f.getId())) {
+                        in.transferTo(zos);
+                    }
+                    zos.closeEntry();
                 }
-                zos.closeEntry();
-            }
 
-            if (!added) {
-                throw new IOException("No hay archivos descargables en carpeta: " + folderName);
+                if (!added) {
+                    throw new IOException("No hay archivos descargables en carpeta: " + folderPath);
+                }
+                zos.finish();
             }
-            zos.finish();
+        } catch (Exception e) {
+            log.error("Error creando ZIP para producto {}: {}", productId, e.getMessage(), e);
+            throw new IOException("Error creando ZIP: " + e.getMessage(), e);
         }
     }
 
@@ -155,10 +197,12 @@ public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long or
         repo.findByDriveFileId(driveFileId).ifPresent(sf -> {
             try {
                 drive.deleteFile(driveFileId);
+                log.info("Archivo eliminado de Drive: {}", driveFileId);
             } catch (IOException e) {
                 log.warn("No se pudo borrar en Drive {}: {}", driveFileId, e.getMessage());
             }
             repo.delete(sf);
+            log.info("Archivo eliminado de BD: {}", driveFileId);
         });
     }
 
@@ -173,5 +217,4 @@ public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long or
                 .uploader(sf.getUploader())
                 .build();
     }
-
 }
