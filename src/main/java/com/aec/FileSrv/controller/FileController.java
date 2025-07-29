@@ -37,31 +37,33 @@ public class FileController {
 
         private static final String GATEWAY_BASE = "https://gateway-production-129e.up.railway.app";
 
-        @PostMapping(path = "/public/{entityId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        public ResponseEntity<FileInfoDto> uploadPublic(
-                        @PathVariable Long entityId,
-                        @RequestParam("type") String type,
-                        @RequestParam(value = "uploader", required = false) String uploader,
-                        @RequestParam("file") MultipartFile file) throws IOException {
-                boolean isProduct = "product".equalsIgnoreCase(type);
+@PostMapping(path = "/public/{entityId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<FileInfoDto> uploadPublic(
+        @PathVariable Long entityId,
+        @RequestParam("type") String type,
+        @RequestParam(value = "uploader", required = false) String uploader,
+        @RequestParam("file") MultipartFile file) throws IOException {
 
-                // Llama a los métodos que ya tienes en FileStorageService
-                FileInfoDto saved = isProduct
-                                ? storage.storeProductFile(file, uploader, entityId)
-                                : storage.storeReceiptFile(file, uploader, entityId);
+    try {
+        boolean isProduct = "product".equalsIgnoreCase(type);
+        FileInfoDto saved = isProduct
+                ? storage.storeProductFile(file, uploader, entityId)
+                : storage.storeReceiptFile(file, uploader, entityId);
 
-                log.info("uploadPublic -> pre-build dto: id={}, driveFileId={}, filename={}",
-                                saved.getId(), saved.getDriveFileId(), saved.getFilename());
+        String downloadViaGateway = UriComponentsBuilder
+                .fromHttpUrl(GATEWAY_BASE)
+                .path("/api/files/{driveId}")
+                .buildAndExpand(saved.getDriveFileId())
+                .toUriString();
+        saved.setDownloadUri(downloadViaGateway);
+        return ResponseEntity.ok(saved);
 
-                String downloadViaGateway = UriComponentsBuilder
-                                .fromHttpUrl(GATEWAY_BASE)
-                                .path("/api/files/{driveId}")
-                                .buildAndExpand(saved.getDriveFileId())
-                                .toUriString();
+    } catch (Exception ex) {
+        log.error("ERROR subiendo comprobante para entityId=" + entityId, ex);
+        throw ex;
+    }
+}
 
-                saved.setDownloadUri(downloadViaGateway);
-                return ResponseEntity.ok(saved);
-        }
 
         @GetMapping("/{driveId}")
         public ResponseEntity<InputStreamResource> serveFile(@PathVariable String driveId) throws IOException {
