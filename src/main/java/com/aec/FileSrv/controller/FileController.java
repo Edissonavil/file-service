@@ -38,14 +38,14 @@ public class FileController {
         private static final String GATEWAY_BASE = "https://gateway-production-129e.up.railway.app";
 
         @PostMapping(path = "/public/{entityId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        public FileInfoDto uploadPublic(
+        public ResponseEntity<FileInfoDto> uploadPublic(
                         @PathVariable Long entityId,
-                        @RequestPart("file") MultipartFile file,
                         @RequestParam("type") String type,
-                        @RequestParam(value = "uploader", required = false) String uploader) throws IOException {
-
+                        @RequestParam(value = "uploader", required = false) String uploader,
+                        @RequestParam("file") MultipartFile file) throws IOException {
                 boolean isProduct = "product".equalsIgnoreCase(type);
 
+                // Llama a los métodos que ya tienes en FileStorageService
                 FileInfoDto saved = isProduct
                                 ? storage.storeProductFile(file, uploader, entityId)
                                 : storage.storeReceiptFile(file, uploader, entityId);
@@ -60,7 +60,7 @@ public class FileController {
                                 .toUriString();
 
                 saved.setDownloadUri(downloadViaGateway);
-                return saved;
+                return ResponseEntity.ok(saved);
         }
 
         @GetMapping("/{driveId}")
@@ -123,13 +123,13 @@ public class FileController {
         }
 
         @GetMapping("/meta/product/{productId}")
-public List<FileInfoDto> getMetaByProduct(@PathVariable Long productId) {
-    // Devuelve todos los archivos asociados a ese producto con su fileType y originalName
-    return repo.findByProductId(productId)
-            .stream()
-            .map(storage::toDto)   // ya tienes toDto(StoredFile)
-            .toList();
-}
-
+        public List<FileInfoDto> getMetaByProduct(@PathVariable Long productId) {
+                // Devuelve todos los archivos asociados a ese producto con su fileType y
+                // originalName
+                return repo.findByProductId(productId)
+                                .stream()
+                                .map(storage::toDto) // ya tienes toDto(StoredFile)
+                                .toList();
+        }
 
 }

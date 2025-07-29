@@ -20,7 +20,6 @@ import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.zip.ZipOutputStream;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -46,26 +45,31 @@ public class FileStorageService {
 
     public FileInfoDto storeProductFile(MultipartFile file, String uploader, Long productId) throws IOException {
         // Carpetas: productos/{productId}
-        String root = drive.getOrCreateFolder("productos", null);
+        String root   = drive.getOrCreateFolder("productos", null);
         String folder = drive.getOrCreateFolder(String.valueOf(productId), root);
 
-        String driveId = drive.uploadFileToFolder(file, folder); // o uploadFileToFolderWithTemp(...)
+        // Subimos DIRECTAMENTE al folder cuyo ID ya tenemos:
+        String driveId = drive.uploadFileToFolderById(file, folder);
+
         StoredFile sf = saveStoredFile(file, uploader, productId, null, driveId);
         return toDto(sf);
     }
 
     public FileInfoDto storeReceiptFile(MultipartFile file, String uploader, Long orderId) throws IOException {
         // Carpetas: comprobantes/{orderId}
-        String root = drive.getOrCreateFolder("comprobantes", null);
+        String root   = drive.getOrCreateFolder("comprobantes", null);
         String folder = drive.getOrCreateFolder(String.valueOf(orderId), root);
 
-        String driveId = drive.uploadFileToFolder(file, folder); // o uploadFileToFolderWithTemp(...)
+        // Subimos DIRECTAMENTE al folder cuyo ID ya tenemos:
+        String driveId = drive.uploadFileToFolderById(file, folder);
+
         StoredFile sf = saveStoredFile(file, uploader, null, orderId, driveId);
         return toDto(sf);
     }
-public void streamProductZipFromDrive(Long productId, OutputStream os) throws IOException {
+
+    public void streamProductZipFromDrive(Long productId, OutputStream os) throws IOException {
         String folderName = "productos/" + productId;
-        String folderId = drive.getOrCreateFolder(folderName);
+        String folderId   = drive.getOrCreateFolder(folderName);
 
         var files = drive.listFilesInFolder(folderId);
 
@@ -73,9 +77,6 @@ public void streamProductZipFromDrive(Long productId, OutputStream os) throws IO
             boolean added = false;
 
             for (DriveFile f : files) {
-                // si quieres excluir imágenes del ZIP, descomenta:
-                // if (f.getMimeType() != null && f.getMimeType().startsWith("image/")) continue;
-
                 added = true;
                 zos.putNextEntry(new java.util.zip.ZipEntry(f.getName()));
                 try (InputStream in = drive.downloadFile(f.getId())) {
@@ -91,13 +92,12 @@ public void streamProductZipFromDrive(Long productId, OutputStream os) throws IO
         }
     }
 
-
     private StoredFile saveStoredFile(MultipartFile file, String uploader,
             Long productId, Long orderId, String driveId) throws IOException {
 
         StoredFile sf = new StoredFile();
         sf.setDriveFileId(driveId);
-        sf.setFilename(file.getOriginalFilename()); // “lógico”
+        sf.setFilename(file.getOriginalFilename());
         sf.setOriginalName(file.getOriginalFilename());
         sf.setFileType(file.getContentType());
         sf.setSize(file.getSize());

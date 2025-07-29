@@ -210,4 +210,31 @@ public String uploadFileToFolder(MultipartFile multipart, String folderPath) thr
         return out;
     }
 
+    /** Sube directamente al folder cuyo ID ya tienes, sin volver a crear carpetas */
+public String uploadFileToFolderById(MultipartFile multipart, String folderId) throws IOException {
+    String filename = multipart.getOriginalFilename() != null
+            ? multipart.getOriginalFilename()
+            : "file";
+    String mime = multipart.getContentType() != null
+            ? multipart.getContentType()
+            : "application/octet-stream";
+
+    File metadata = new File()
+            .setName(filename)
+            .setParents(List.of(folderId));    // aquí usamos folderId directamente
+
+    try (InputStream in = multipart.getInputStream()) {
+        InputStreamContent mediaContent = new InputStreamContent(mime, in);
+        mediaContent.setLength(multipart.getSize());
+
+        File uploaded = drive.files()
+                .create(metadata, mediaContent)
+                .setFields("id")
+                .execute();
+
+        return uploaded.getId();
+    }
+}
+
+
 }
