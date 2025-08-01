@@ -28,6 +28,10 @@ jwt:
   accessMs: ${JWT_ACCESS_MS:36000000}
   refreshMs: ${JWT_REFRESH_MS:86400000}
 
+file-service:
+  gateway-base-url: https://gateway-production-129e.up.railway.app
+
+
 google:
   oauth:
     client-id: ${GOOGLE_CLIENT_ID}

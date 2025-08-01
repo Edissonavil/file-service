@@ -4,6 +4,8 @@ import com.aec.FileSrv.Repository.StoredFileRepository;
 import com.aec.FileSrv.drive.DriveFile;
 import com.aec.FileSrv.dto.FileInfoDto;
 import com.aec.FileSrv.model.StoredFile;
+import com.google.api.client.util.Value;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import okio.internal.ZipEntry;
@@ -12,6 +14,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -20,6 +23,7 @@ import java.io.OutputStream;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.zip.ZipOutputStream;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -27,6 +31,8 @@ public class FileStorageService {
 
     private final StoredFileRepository repo;
     private final GoogleDriveService drive;
+    @Value("${file-service.gateway-base-url}")
+    private String gatewayBaseUrl;
 
     public Resource loadAsResource(String driveFileId) throws IOException {
         Optional<StoredFile> sf = repo.findByDriveFileId(driveFileId);
@@ -61,7 +67,8 @@ public class FileStorageService {
             String driveId = drive.uploadFileToFolder(file, folder);
 
             // Buscar si ya existe
-            Optional<StoredFile> existingStoredFile = repo.findByProductIdAndFilename(productId, file.getOriginalFilename());
+            Optional<StoredFile> existingStoredFile = repo.findByProductIdAndFilename(productId,
+                    file.getOriginalFilename());
 
             StoredFile sf;
             if (existingStoredFile.isPresent()) {
@@ -113,7 +120,8 @@ public class FileStorageService {
             String driveId = drive.uploadFileToFolder(file, folder);
 
             // Buscar si ya existe
-            Optional<StoredFile> existingStoredFile = repo.findByOrderIdAndFilename(orderId, file.getOriginalFilename());
+            Optional<StoredFile> existingStoredFile = repo.findByOrderIdAndFilename(orderId,
+                    file.getOriginalFilename());
 
             StoredFile sf;
             if (existingStoredFile.isPresent()) {
@@ -207,6 +215,12 @@ public class FileStorageService {
     }
 
     public FileInfoDto toDto(StoredFile sf) {
+        String downloadUri = UriComponentsBuilder
+                .fromHttpUrl(gatewayBaseUrl)
+                .path("/api/files/{driveId}")
+                .buildAndExpand(sf.getDriveFileId())
+                .toUriString();
+
         return FileInfoDto.builder()
                 .id(sf.getId())
                 .driveFileId(sf.getDriveFileId())
@@ -215,6 +229,7 @@ public class FileStorageService {
                 .fileType(sf.getFileType())
                 .size(sf.getSize())
                 .uploader(sf.getUploader())
+                .downloadUri(downloadUri)
                 .build();
     }
 }
