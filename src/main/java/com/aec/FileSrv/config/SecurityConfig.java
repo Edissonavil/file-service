@@ -119,7 +119,8 @@ public class SecurityConfig {
         cfg.setAllowedOrigins(List.of(
             "https://gateway-production-129e.up.railway.app",
             "https://aecf-production.up.railway.app",
-            "https://file-service-production-31f3.up.railway.app"
+            "https://file-service-production-31f3.up.railway.app",
+            "https://aecblock.com"
         ));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
